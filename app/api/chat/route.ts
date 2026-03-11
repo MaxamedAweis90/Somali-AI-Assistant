@@ -1,21 +1,24 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { AI_MODEL_IDS } from "@/lib/ai/model-catalog";
 import {
   cleanMessageContent,
 } from "@/lib/ai/usage-optimization";
-import { generateAIResponse } from "@/lib/ai/ai-service";
+import { generateAIResponseStream } from "@/lib/ai/ai-service";
 
 const chatRequestSchema = z.object({
   messages: z
     .array(
       z.object({
         role: z.enum(["user", "assistant"]),
-        content: z.string().trim().min(1).max(8000),
+        content: z.string().trim().min(1).max(16000),
       })
     )
     .min(1)
-    .max(5),
-  summary: z.string().trim().max(5000).optional(),
+    .max(14),
+  summary: z.string().trim().max(12000).optional(),
+  modelId: z.enum(AI_MODEL_IDS).optional(),
+  useWebSearch: z.boolean().optional(),
 });
 
 const FRIENDLY_AI_ERROR = "Wax yar ayaa khaldamay. Fadlan isku day mar kale.";
@@ -44,35 +47,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Fariinta user-ka lama helin." }, { status: 400 });
     }
 
-    let providerError: string | null = null;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          for await (const event of generateAIResponseStream({
+            messages,
+            summary,
+            modelId: result.data.modelId,
+            useWebSearch: result.data.useWebSearch,
+          })) {
+            controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+          }
+        } catch (error) {
+          if (error instanceof Error) {
+            console.error("AI provider request failed:", error.message);
+          } else {
+            console.error("AI provider request failed.");
+          }
 
-    try {
-      const providerReply = await generateAIResponse({ messages, summary });
+          controller.enqueue(encoder.encode(`${JSON.stringify({ type: "error", error: FRIENDLY_AI_ERROR })}\n`));
+        } finally {
+          controller.close();
+        }
+      },
+    });
 
-      return NextResponse.json({
-        message: providerReply.content,
-        mode: "provider",
-        provider: providerReply.provider,
-        model: providerReply.model,
-        usage: providerReply.usage,
-      });
-    } catch (error) {
-      providerError = FRIENDLY_AI_ERROR;
-
-      if (error instanceof Error) {
-        console.error("AI provider request failed:", error.message);
-      } else {
-        console.error("AI provider request failed.");
-      }
-    }
-
-    return NextResponse.json({
-      message: FRIENDLY_AI_ERROR,
-      mode: "fallback",
-      provider: "fallback",
-      model: null,
-      providerError,
-      usage: null,
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
     });
   } catch {
     return NextResponse.json({ error: "Cilad ayaa ka dhacday chat API-ga." }, { status: 500 });

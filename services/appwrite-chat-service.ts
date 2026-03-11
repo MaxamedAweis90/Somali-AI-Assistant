@@ -2,7 +2,10 @@ import { ID, Permission, Query, Role, type Models } from "appwrite";
 import { appwriteConfig, getAppwriteConfigError, getDatabases, isAppwriteConfigured } from "@/lib/appwrite/client";
 import { estimateTokenCount } from "@/lib/ai/usage-optimization";
 import { getCurrentUser } from "@/services/auth-service";
-import type { ChatConversation, ChatMessage } from "@/types/chat";
+import type { ChatConversation, ChatMessage, ChatSource } from "@/types/chat";
+
+const STORED_CONVERSATION_LIMIT = 100;
+const STORED_MESSAGE_LIMIT = 500;
 
 type ConversationDocument = Models.Document & {
   userId: string;
@@ -18,6 +21,8 @@ type MessageDocument = Models.Document & {
   conversationId: string;
   role: "user" | "assistant";
   content: string;
+  grounded?: boolean;
+  sourcesJson?: string;
   tokenEstimate?: number;
   createdAt: string;
 };
@@ -86,6 +91,34 @@ function toConversation(document: ConversationDocument): ChatConversation {
   };
 }
 
+function parseStoredSources(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as ChatSource[];
+
+    if (!Array.isArray(parsed)) {
+      return undefined;
+    }
+
+    return parsed.filter((source) =>
+      Boolean(source && typeof source.title === "string" && typeof source.url === "string" && typeof source.domain === "string")
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function serializeStoredSources(sources: ChatSource[] | undefined) {
+  if (!sources || sources.length === 0) {
+    return "";
+  }
+
+  return JSON.stringify(sources.slice(0, 6));
+}
+
 function toMessage(document: MessageDocument): ChatMessage {
   return {
     id: document.$id,
@@ -93,6 +126,8 @@ function toMessage(document: MessageDocument): ChatMessage {
     content: document.content,
     createdAt: document.createdAt,
     tokenEstimate: typeof document.tokenEstimate === "number" ? document.tokenEstimate : 0,
+    grounded: Boolean(document.grounded),
+    sources: parseStoredSources(document.sourcesJson),
   };
 }
 
@@ -147,14 +182,14 @@ export async function listStoredConversations() {
   const result = await databases.listDocuments<ConversationDocument>(
     appwriteConfig.databaseId,
     appwriteConfig.conversationsCollectionId,
-    [Query.equal("userId", userId), Query.orderDesc("updatedAt"), Query.limit(50)]
+    [Query.equal("userId", userId), Query.orderDesc("updatedAt"), Query.limit(STORED_CONVERSATION_LIMIT)]
   );
 
   return result.documents.map(toConversation);
 }
 
 export async function listStoredMessages(conversationId: string) {
-  const { userId } = await getOwnedConversationDocument(conversationId);
+  const userId = await requireCurrentUserId();
   const databases = requireDatabases();
   const result = await databases.listDocuments<MessageDocument>(
     appwriteConfig.databaseId,
@@ -163,7 +198,7 @@ export async function listStoredMessages(conversationId: string) {
       Query.equal("userId", userId),
       Query.equal("conversationId", conversationId),
       Query.orderAsc("createdAt"),
-      Query.limit(200),
+      Query.limit(STORED_MESSAGE_LIMIT),
     ]
   );
 
@@ -197,7 +232,6 @@ export async function touchStoredConversation(
   conversationId: string,
   options?: { latestUserText?: string; summary?: string; messageCount?: number }
 ) {
-  await getOwnedConversationDocument(conversationId);
   const databases = requireDatabases();
   const data: Record<string, string | number> = {
     updatedAt: new Date().toISOString(),
@@ -221,26 +255,61 @@ export async function touchStoredConversation(
   return toConversation(document);
 }
 
-export async function createStoredMessage(conversationId: string, role: "user" | "assistant", content: string) {
+export async function createStoredMessage(
+  conversationId: string,
+  role: "user" | "assistant",
+  content: string,
+  options?: { grounded?: boolean; sources?: ChatSource[] }
+) {
   const userId = await requireCurrentUserId();
-  await getOwnedConversationDocument(conversationId);
   const databases = requireDatabases();
   const tokenEstimate = estimateTokenCount(content);
+  const sourcesJson = serializeStoredSources(options?.sources);
+  const documentData = {
+    userId,
+    conversationId,
+    role,
+    content,
+    grounded: Boolean(options?.grounded),
+    sourcesJson,
+    tokenEstimate,
+    createdAt: new Date().toISOString(),
+  };
 
-  const document = await databases.createDocument<MessageDocument>(
-    appwriteConfig.databaseId,
-    appwriteConfig.messagesCollectionId,
-    ID.unique(),
-    {
-      userId,
-      conversationId,
-      role,
-      content,
-      tokenEstimate,
-      createdAt: new Date().toISOString(),
-    },
-    buildDocumentPermissions(userId)
-  );
+  const fallbackDocumentData = {
+    userId,
+    conversationId,
+    role,
+    content,
+    tokenEstimate,
+    createdAt: documentData.createdAt,
+  };
+
+  let document: MessageDocument;
+
+  try {
+    document = await databases.createDocument<MessageDocument>(
+      appwriteConfig.databaseId,
+      appwriteConfig.messagesCollectionId,
+      ID.unique(),
+      documentData,
+      buildDocumentPermissions(userId)
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (!/unknown attribute|attribute not found|invalid document structure/i.test(message)) {
+      throw error;
+    }
+
+    document = await databases.createDocument<MessageDocument>(
+      appwriteConfig.databaseId,
+      appwriteConfig.messagesCollectionId,
+      ID.unique(),
+      fallbackDocumentData,
+      buildDocumentPermissions(userId)
+    );
+  }
 
   return toMessage(document);
 }
@@ -275,7 +344,7 @@ export async function deleteStoredConversation(conversationId: string) {
   const relatedMessages = await databases.listDocuments<MessageDocument>(
     appwriteConfig.databaseId,
     appwriteConfig.messagesCollectionId,
-    [Query.equal("userId", userId), Query.equal("conversationId", conversationId), Query.limit(200)]
+    [Query.equal("userId", userId), Query.equal("conversationId", conversationId), Query.limit(STORED_MESSAGE_LIMIT)]
   );
 
   await Promise.all(

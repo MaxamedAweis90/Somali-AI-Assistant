@@ -1,11 +1,11 @@
 import type { ChatMessage } from "@/types/chat";
 
-export const AI_RECENT_MESSAGE_LIMIT = 5;
-export const AI_SUMMARY_TRIGGER_COUNT = 12;
-export const AI_DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
+export const AI_RECENT_MESSAGE_LIMIT = 12;
+export const AI_SUMMARY_TRIGGER_COUNT = 14;
+export const AI_DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 export const AI_DEFAULT_OPENAI_MODEL = "gpt-4o";
 export const AI_DEFAULT_TEMPERATURE = 0.4;
-export const AI_DEFAULT_MAX_TOKENS = 900;
+export const AI_DEFAULT_MAX_TOKENS = 2200;
 
 export function cleanMessageContent(text: string) {
   return text.replace(/\s+/g, " ").trim();
@@ -28,7 +28,7 @@ export function cleanMessages(messages: ChatMessage[]) {
 function summarizeMessage(message: ChatMessage) {
   const label = message.role === "user" ? "User" : "Assistant";
   const content = cleanMessageContent(message.content);
-  const shortened = content.length <= 160 ? content : `${content.slice(0, 160).trim()}...`;
+  const shortened = content.length <= 360 ? content : `${content.slice(0, 360).trim()}...`;
   return `- ${label}: ${shortened}`;
 }
 
@@ -47,7 +47,7 @@ export function buildConversationSummary(messages: ChatMessage[]) {
 
   return [
     "Soo koobid wada sheekaysiga hore:",
-    ...olderMessages.slice(-8).map(summarizeMessage),
+    ...olderMessages.slice(-16).map(summarizeMessage),
     "- Ka jawaab Somali cad oo toos ah, adigoo sii wata macnaha wada sheekaysiga.",
   ].join("\n");
 }

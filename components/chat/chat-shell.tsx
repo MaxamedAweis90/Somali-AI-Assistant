@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Menu } from "lucide-react";
+import { Braces, ChevronDown, Globe, Menu } from "lucide-react";
 import { AuthRequiredModal } from "@/components/auth/auth-required-modal";
 import type { ChatConversation, ChatMessage } from "@/types/chat";
 import { ChatEmptyState } from "@/components/chat/chat-empty-state";
@@ -10,7 +11,41 @@ import { ChatSidebar } from "@/components/sidebar/chat-sidebar";
 import { MessageList } from "@/components/chat/message-list";
 import { MessageInput } from "@/components/chat/message-input";
 import { useChatUIStore } from "@/stores/chat-ui-store";
+import { findAIModelByApiModel, getAIModelOption, getAIModelOptions, getModelLabel, type AIProvider } from "@/lib/ai/model-catalog";
 import { cn } from "@/lib/utils";
+
+const TEMPLATE_EXPLANATIONS: Record<NonNullable<ChatMessage["responseTemplate"]>, { label: string; reason: string; structure: string }> = {
+  history: {
+    label: "History",
+    reason: "Used when the question asks about timelines, eras, leaders, or what happened first.",
+    structure: "Organizes the answer by period, sequence, and key events.",
+  },
+  comparison: {
+    label: "Comparison",
+    reason: "Used when the question asks for differences, pros and cons, or side-by-side evaluation.",
+    structure: "Breaks the reply into criteria so options are easy to compare.",
+  },
+  "how-to": {
+    label: "How-To",
+    reason: "Used for task-based questions that need steps, instructions, or a process.",
+    structure: "Presents the answer as ordered actions with practical guidance.",
+  },
+  biography: {
+    label: "Biography",
+    reason: "Used when the question is about a person, their background, or major achievements.",
+    structure: "Groups the answer into identity, background, milestones, and impact.",
+  },
+  analysis: {
+    label: "Analysis",
+    reason: "Used for deeper reasoning, tradeoffs, causes, and consequences.",
+    structure: "Separates the answer into themes, evidence, and takeaways.",
+  },
+  general: {
+    label: "General",
+    reason: "Used when there is no stronger pattern like history, comparison, or step-by-step guidance.",
+    structure: "Keeps the answer clean with short sections and direct explanations.",
+  },
+};
 
 interface ChatShellProps {
   showLoadingState?: boolean;
@@ -22,11 +57,12 @@ interface ChatShellProps {
   input: string;
   isTyping: boolean;
   totalMessages: number;
-  responseSource: "gemini" | "openai" | "fallback";
+  responseSource: AIProvider | null;
   responseModel: string | null;
   providerError: string | null;
   onInputChange: (value: string) => void;
   onSend: () => void;
+  onEditSubmit?: (messageId: string, text: string) => void;
   onNewChat: () => void;
   onSelectConversation: (id: string) => void;
   onRenameConversation: (id: string, title: string) => Promise<void>;
@@ -59,6 +95,7 @@ export function ChatShell({
   providerError,
   onInputChange,
   onSend,
+  onEditSubmit,
   onNewChat,
   onSelectConversation,
   onRenameConversation,
@@ -75,16 +112,66 @@ export function ChatShell({
   onRequireAuth,
   onLogout,
 }: ChatShellProps) {
+  const templatePopoverRef = useRef<HTMLDivElement>(null);
+  const modelPopoverRef = useRef<HTMLDivElement>(null);
+  const [isTemplatePopoverOpen, setIsTemplatePopoverOpen] = useState(false);
+  const [isModelPopoverOpen, setIsModelPopoverOpen] = useState(false);
   const isEmpty = messages.length === 0;
   const isSidebarCollapsed = useChatUIStore((state) => state.isSidebarCollapsed);
+  const selectedModelId = useChatUIStore((state) => state.selectedModelId);
+  const webSearchEnabled = useChatUIStore((state) => state.webSearchEnabled);
   const toggleSidebarCollapsed = useChatUIStore((state) => state.toggleSidebarCollapsed);
-  const providerLabel =
-    responseSource === "gemini"
-      ? responseModel ?? "Gemini"
-      : responseSource === "openai"
-        ? responseModel ?? "OpenAI"
-        : "Fallback";
+  const setSelectedModelId = useChatUIStore((state) => state.setSelectedModelId);
+  const activeModel = findAIModelByApiModel(responseModel);
+  const selectedModel = getAIModelOption(selectedModelId);
+  const switchableModels = useMemo(
+    () => getAIModelOptions("chat").filter((option) => option.status === "ready"),
+    []
+  );
+  const providerLabel = activeModel?.label ?? getModelLabel(selectedModelId, responseModel);
   const showEmptyState = !showLoadingState && !isConversationPending && isEmpty;
+  const latestAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant") ?? streamingMessage;
+  const showWebStatus = webSearchEnabled && (responseSource === "gemini" || latestAssistantMessage?.grounded || latestAssistantMessage?.searchingWeb);
+  const templateLabel = latestAssistantMessage?.responseTemplate ? latestAssistantMessage.responseTemplate.replace("-", " ") : null;
+  const templateDetails = latestAssistantMessage?.responseTemplate
+    ? TEMPLATE_EXPLANATIONS[latestAssistantMessage.responseTemplate]
+    : null;
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!templatePopoverRef.current?.contains(event.target as Node)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsTemplatePopoverOpen(false);
+      }
+
+      if (!modelPopoverRef.current?.contains(event.target as Node)) {
+        setIsModelPopoverOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsTemplatePopoverOpen(false);
+        setIsModelPopoverOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!templateDetails) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsTemplatePopoverOpen(false);
+    }
+  }, [templateDetails]);
 
   if (showLoadingState) {
     return <ChatShellLoading />;
@@ -120,39 +207,109 @@ export function ChatShell({
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(125,211,252,0.12),transparent_24%),linear-gradient(180deg,rgba(5,10,24,0.18),rgba(2,6,23,0.02))]" />
 
         <div className="relative z-10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,26,52,0.92),rgba(15,23,42,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-        <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-4 py-3 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 pointer-events-auto">
+        <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between p-3 sm:px-6 md:py-4">
+          <div className="flex items-center gap-2 pointer-events-auto">
             <button
               type="button"
-              className="inline-flex size-10 items-center justify-center rounded-full border border-white/10 bg-white/4 text-slate-300 md:hidden"
+              onClick={toggleSidebarCollapsed}
+              className="inline-flex size-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800/50 transition md:hidden"
               aria-label="Open sidebar"
             >
-              <Menu className="size-4" />
+              <Menu className="size-5" />
             </button>
-            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/45 px-3 py-2 backdrop-blur-md">
-              <div className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/5 ring-1 ring-sky-300/10">
-                <Image src="/images/GARAS.png" alt="GARAS Chat logo" fill sizes="32px" className="object-contain p-1" priority />
-              </div>
-              <div>
-                <h1 className="text-sm font-semibold text-white">GARAS Chat</h1>
-                <p className="text-xs text-slate-400">Somali AI Assistant</p>
-              </div>
+
+            <div ref={modelPopoverRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setIsModelPopoverOpen((current) => !current)}
+                className="group flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-slate-800/50"
+                aria-label="Switch model"
+                aria-expanded={isModelPopoverOpen}
+              >
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-semibold text-white tracking-tight">GARAS</h1>
+                  <span className="text-lg font-medium text-slate-400">{selectedModel?.shortLabel ?? providerLabel}</span>
+                </div>
+                <ChevronDown className={cn("size-4 text-slate-500 transition-transform duration-200 group-hover:text-slate-300", isModelPopoverOpen && "rotate-180")} />
+              </button>
+
+              {isModelPopoverOpen && (
+                <div className="absolute left-2 top-full z-30 mt-1 w-80 rounded-2xl border border-white/10 bg-[#171717] p-1.5 shadow-2xl origin-top-left animate-in fade-in zoom-in-95">
+                  <div className="px-3 pb-2 pt-2 mb-1 border-b border-white/5">
+                    <p className="text-xs font-medium text-slate-400">Model Configuration</p>
+                  </div>
+
+                  <div className="flex flex-col gap-0.5">
+                    {switchableModels.map((option) => {
+                      const isActive = selectedModelId === option.id;
+
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedModelId(option.id);
+                            setIsModelPopoverOpen(false);
+                          }}
+                          className={cn(
+                            "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+                            isActive
+                              ? "bg-slate-800/80 text-white"
+                              : "text-slate-300 hover:bg-slate-800/50"
+                          )}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{option.label}</span>
+                            <span className="text-xs text-slate-400 mt-0.5">{option.apiModel}</span>
+                          </div>
+                          {isActive && (
+                            <div className="flex size-5 items-center justify-center rounded-full bg-white text-black">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/45 px-3 py-2 text-xs text-slate-300 backdrop-blur-md">
-            <span>Fariimo: {totalMessages}</span>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5",
-                responseSource !== "fallback"
-                  ? "bg-emerald-400/12 text-emerald-200"
-                  : "bg-amber-400/12 text-amber-100"
-              )}
-            >
-              {`AI: ${providerLabel}`}
-            </span>
-            {responseSource === "fallback" && providerError && (
+          <div className="pointer-events-auto flex items-center gap-2">
+            {showWebStatus && (
+              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 shadow-sm backdrop-blur-md border", latestAssistantMessage?.grounded ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : "bg-sky-500/10 text-sky-300 border-sky-500/20")}>
+                <Globe className="size-3.5" />
+                <span className="text-xs font-medium">{latestAssistantMessage?.grounded ? "Web verified" : "Web search active"}</span>
+              </span>
+            )}
+            
+            {templateLabel && templateDetails && (
+              <div ref={templatePopoverRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsTemplatePopoverOpen((current) => !current)}
+                  className="inline-flex items-center gap-1 rounded-full bg-white/8 px-2 py-0.5 text-slate-200 transition hover:bg-white/12"
+                  aria-expanded={isTemplatePopoverOpen}
+                  aria-label={`Explain ${templateDetails.label} format`}
+                >
+                  <Braces className="size-3" />
+                  {`Format: ${templateLabel}`}
+                </button>
+
+                {isTemplatePopoverOpen && (
+                  <div className="absolute right-0 top-full z-30 mt-2 w-[min(320px,calc(100vw-2rem))] rounded-[18px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,26,52,0.98),rgba(15,23,42,0.99))] p-3 text-left shadow-[0_24px_80px_rgba(2,6,23,0.45)] backdrop-blur-xl">
+                    <div className="flex items-center gap-2 text-slate-100">
+                      <Braces className="size-3.5 text-sky-200" />
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em]">{templateDetails.label}</p>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-300">{templateDetails.reason}</p>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">{templateDetails.structure}</p>
+                  </div>
+                )}
+              </div>
+            )}
+            {providerError && (
               <span className="max-w-[320px] truncate rounded-full bg-rose-400/12 px-2 py-0.5 text-rose-100" title={providerError}>
                 {providerError}
               </span>
@@ -217,6 +374,7 @@ export function ChatShell({
                   messages={messages}
                   streamingMessage={streamingMessage}
                   isTyping={isTyping}
+                  onEditSubmit={onEditSubmit}
                 />
               )}
               <MessageInput value={input} isTyping={isTyping} onChange={onInputChange} onSubmit={onSend} />

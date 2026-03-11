@@ -1,5 +1,16 @@
 export type ChatRole = "user" | "assistant";
 
+export interface ChatSource {
+  title: string;
+  url: string;
+  domain: string;
+}
+
+export interface ChatImageQuota {
+  dateKey: string;
+  used: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatRole;
@@ -7,6 +18,10 @@ export interface ChatMessage {
   createdAt: string;
   tokenEstimate?: number;
   isStreaming?: boolean;
+  grounded?: boolean;
+  searchingWeb?: boolean;
+  responseTemplate?: "history" | "comparison" | "how-to" | "biography" | "analysis" | "general";
+  sources?: ChatSource[];
 }
 
 export interface ChatConversation {

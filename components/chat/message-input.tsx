@@ -1,8 +1,22 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useEffect, useId, useRef, useState } from "react";
-import { Expand, Minimize2, Mic, Plus, SendHorizontal, SlidersHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  Check,
+  Globe,
+  ImagePlus,
+  Mic,
+  Plus,
+  ArrowUp,
+  X,
+  Maximize2,
+  Minimize2
+} from "lucide-react";
+import {
+  AI_IMAGE_DAILY_LIMIT,
+} from "@/lib/ai/model-catalog";
+import { useChatUIStore } from "@/stores/chat-ui-store";
 import { cn } from "@/lib/utils";
 
 interface MessageInputProps {
@@ -13,6 +27,14 @@ interface MessageInputProps {
   variant?: "docked" | "centered";
 }
 
+interface FloatingMenuPosition {
+  top?: number;
+  bottom?: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+}
+
 export function MessageInput({
   value,
   isTyping,
@@ -21,15 +43,38 @@ export function MessageInput({
   variant = "docked",
 }: MessageInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const plusButtonRef = useRef<HTMLButtonElement>(null);
+  const optionsMenuRef = useRef<HTMLDivElement>(null);
+
+  const [isOptionsMenuOpen, setIsOptionsMenuOpen] = useState(false);
+  const [optionsMenuPosition, setOptionsMenuPosition] = useState<FloatingMenuPosition | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
-  const expandRegionId = useId();
+  
+  const selectedToolMode = useChatUIStore((state) => state.selectedToolMode);
+  const imageQuota = useChatUIStore((state) => state.imageQuota);
+  const webSearchEnabled = useChatUIStore((state) => state.webSearchEnabled);
+  
+  const setSelectedToolMode = useChatUIStore((state) => state.setSelectedToolMode);
+  const setWebSearchEnabled = useChatUIStore((state) => state.setWebSearchEnabled);
+  
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const imageRemaining = imageQuota.dateKey === todayKey
+    ? Math.max(0, AI_IMAGE_DAILY_LIMIT - imageQuota.used)
+    : AI_IMAGE_DAILY_LIMIT;
 
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    const maxLines = isExpanded ? 14 : 7;
-    const lineHeight = 28;
+    if (isExpanded) {
+      textarea.style.height = "100%";
+      textarea.style.overflowY = "auto";
+      return;
+    }
+
+    const maxLines = 14;
+    const lineHeight = 24;
     const maxHeight = lineHeight * maxLines;
 
     textarea.style.height = "auto";
@@ -39,25 +84,106 @@ export function MessageInput({
   }, [value, isExpanded]);
 
   useEffect(() => {
-    if (!isExpanded) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
+    if (isExpanded) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
     return () => {
-      document.body.style.overflow = previousOverflow;
+      document.body.style.overflow = "";
     };
   }, [isExpanded]);
 
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        !containerRef.current?.contains(event.target as Node) &&
+        !optionsMenuRef.current?.contains(event.target as Node)
+      ) {
+        setIsOptionsMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOptionsMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    const getMenuPosition = (button: HTMLButtonElement | null): FloatingMenuPosition | null => {
+      if (!button) return null;
+
+      const rect = button.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const width = 240;
+      const verticalGap = 12;
+      const verticalMargin = 16;
+      
+      const left = Math.min(Math.max(16, rect.left), viewportWidth - width - 16);
+      const availableAbove = rect.top - verticalMargin;
+      const availableBelow = viewportHeight - rect.bottom - verticalMargin;
+      
+      const shouldOpenAbove = availableAbove >= 150 || availableAbove >= availableBelow;
+      
+      if (shouldOpenAbove) {
+        return {
+          bottom: viewportHeight - rect.top + verticalGap,
+          left,
+          width,
+          maxHeight: Math.max(150, availableAbove - verticalGap)
+        };
+      } else {
+        return {
+          top: rect.bottom + verticalGap,
+          left,
+          width,
+          maxHeight: Math.max(150, availableBelow - verticalGap)
+        };
+      }
+    };
+
+    const syncMenuPosition = () => {
+      if (isOptionsMenuOpen) {
+        setOptionsMenuPosition(getMenuPosition(plusButtonRef.current));
+      }
+    };
+
+    if (isOptionsMenuOpen) {
+      syncMenuPosition();
+      window.addEventListener("resize", syncMenuPosition);
+      window.addEventListener("scroll", syncMenuPosition, true);
+    }
+
+    return () => {
+      window.removeEventListener("resize", syncMenuPosition);
+      window.removeEventListener("scroll", syncMenuPosition, true);
+    };
+  }, [isOptionsMenuOpen]);
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (selectedToolMode === "image" || !value.trim()) return;
     onSubmit();
+    setIsExpanded(false);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
+      if (selectedToolMode === "image" || !value.trim()) return;
       onSubmit();
+      setIsExpanded(false);
     }
 
     if (event.key === "Escape" && isExpanded) {
@@ -66,127 +192,200 @@ export function MessageInput({
     }
   };
 
-  const isCentered = variant === "centered";
+  const hasText = value.trim().length > 0;
 
-  const shell = (
-    <div
-      className={cn(
-        "rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(12,18,33,0.96),rgba(7,12,25,0.98))] text-slate-100 backdrop-blur-xl transition-shadow duration-200",
-        isExpanded ? "composer-shell-expanded" : "composer-shell"
-      )}
-    >
-      <div className="flex min-w-0 flex-col overflow-hidden rounded-[30px]">
+  const optionsMenu = isOptionsMenuOpen && optionsMenuPosition
+    ? createPortal(
         <div
-          id={expandRegionId}
+          ref={optionsMenuRef}
           className={cn(
-            "relative px-5 pt-4",
-            isExpanded ? "min-h-88 pb-3 sm:min-h-96" : "pb-2"
+            "fixed z-[200] rounded-[16px] border border-white/5 bg-[#2f2f2f] shadow-2xl animate-in fade-in zoom-in-95 text-slate-100 flex flex-col p-1.5",
+            optionsMenuPosition.bottom !== undefined ? "origin-bottom-left" : "origin-top-left"
           )}
+          style={{
+            ...(optionsMenuPosition.top !== undefined ? { top: optionsMenuPosition.top } : {}),
+            ...(optionsMenuPosition.bottom !== undefined ? { bottom: optionsMenuPosition.bottom } : {}),
+            left: optionsMenuPosition.left,
+            width: optionsMenuPosition.width,
+            maxHeight: optionsMenuPosition.maxHeight,
+          }}
         >
-          <button
-            type="button"
-            onClick={() => setIsExpanded((current) => !current)}
-            className="absolute right-4 top-4 z-10 inline-flex size-6 items-center justify-center text-slate-500 transition hover:text-slate-200"
-            aria-label={isExpanded ? "Collapse composer" : "Expand composer"}
-            aria-controls={expandRegionId}
-            aria-expanded={isExpanded}
-          >
-            {isExpanded ? <Minimize2 className="size-3.5" /> : <Expand className="size-3.5" />}
-          </button>
-
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            placeholder="Su'aashaada Af-Somali ku qor..."
-            className={cn(
-              "no-scrollbar block w-full min-w-0 resize-none bg-transparent pr-11 text-[15px] leading-7 text-slate-100 outline-none placeholder:text-slate-500",
-              isExpanded ? "min-h-72" : "min-h-7"
-            )}
-          />
-        </div>
-
-        <div className="border-t border-white/8 px-4 py-2.5 sm:px-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex max-w-full flex-wrap items-center justify-end gap-1.5">
+          <div className="overflow-y-auto chat-scrollbar-soft">
+            <div className="space-y-0.5">
               <button
                 type="button"
-                className="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/8"
-                aria-label="Add attachment"
+                onClick={() => {
+                  setWebSearchEnabled(!webSearchEnabled);
+                  if (selectedToolMode === "image") setSelectedToolMode("chat");
+                  setIsOptionsMenuOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-[15px] transition-colors",
+                  webSearchEnabled ? "bg-white/10 text-white font-medium" : "text-slate-300 hover:bg-white/5 hover:text-white"
+                )}
               >
-                <Plus className="size-4.5" />
+                <div className="flex items-center gap-3">
+                  <Globe className={cn("size-[18px]", webSearchEnabled ? "text-emerald-400" : "text-slate-400")} />
+                  <span>Search web</span>
+                </div>
+                {webSearchEnabled && <Check className="size-4 text-emerald-400" />}
               </button>
 
               <button
                 type="button"
-                className="inline-flex h-9 items-center gap-2 rounded-full px-3 text-sm text-slate-300 transition hover:bg-white/8"
-                aria-label="Tools"
+                onClick={() => {
+                  setSelectedToolMode(selectedToolMode === "image" ? "chat" : "image");
+                  if (webSearchEnabled) setWebSearchEnabled(false);
+                  setIsOptionsMenuOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left text-[15px] transition-colors",
+                  selectedToolMode === "image" ? "bg-white/10 text-white font-medium" : "text-slate-300 hover:bg-white/5 hover:text-white"
+                )}
               >
-                <SlidersHorizontal className="size-4" />
-                Tools
+                <div className="flex items-center gap-3">
+                  <ImagePlus className={cn("size-[18px]", selectedToolMode === "image" ? "text-sky-400" : "text-slate-400")} />
+                  <span>Create image</span>
+                </div>
+                {selectedToolMode === "image" && <Check className="size-4 text-sky-400" />}
               </button>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                className="inline-flex h-9 items-center gap-2 rounded-full px-3 text-sm text-slate-300 transition hover:bg-white/8"
-                aria-label="Thinking mode"
-              >
-                Thinking
-                <span className="text-xs text-slate-500">▾</span>
-              </button>
-
-              <button
-                type="button"
-                className="inline-flex size-9 items-center justify-center rounded-full text-slate-300 transition hover:bg-white/8"
-                aria-label="Voice input"
-              >
-                <Mic className="size-4" />
-              </button>
-
-              <Button
-                type="submit"
-                disabled={!value.trim() || isTyping}
-                size="icon"
-                className="size-10 rounded-full bg-sky-400 text-slate-950 hover:bg-sky-300 disabled:bg-white/8 disabled:text-slate-500"
-              >
-                <SendHorizontal className="size-4" />
-              </Button>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
+        </div>,
+        document.body
+      )
+    : null;
 
   return (
     <>
+      {optionsMenu}
+      
       {isExpanded && (
-        <div className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-[3px]" onClick={() => setIsExpanded(false)} />
+        <div 
+          className="fixed inset-0 z-[140] bg-black/60 backdrop-blur-[2px] animate-in fade-in duration-200" 
+          onClick={() => setIsExpanded(false)} 
+        />
       )}
 
-      <form
-        onSubmit={handleSubmit}
-        className={cn(
-          isCentered
-            ? "overflow-x-hidden px-0 py-0"
-            : "shrink-0 overflow-x-hidden border-t border-white/10 bg-[linear-gradient(180deg,rgba(2,6,23,0.16),rgba(2,6,23,0.6))] px-4 py-4 sm:px-6 lg:px-8",
-          isExpanded && "relative z-50"
-        )}
-      >
-        <div
-          className={cn(
-            "mx-auto min-w-0 w-full",
-            isCentered ? "max-w-170" : "max-w-160",
-            isExpanded && "fixed inset-x-0 top-[8vh] z-50 w-[min(820px,calc(100vw-2rem))] max-w-none"
-          )}
-        >
-          {shell}
-        </div>
-      </form>
+      <div className={cn(
+        "w-full transition-all flex justify-center", 
+        isExpanded ? "fixed inset-0 z-[150] items-center p-4 sm:p-8 md:p-12 lg:p-20 pointer-events-none fade-in duration-300" : "pb-4",
+        !isExpanded && (variant === "centered" ? "max-w-3xl mx-auto px-4" : "px-4 sm:px-6 lg:px-8")
+      )}>
+        <form onSubmit={handleSubmit} className={cn("w-full relative shadow-sm max-w-4xl pointer-events-auto", isExpanded && "h-[85vh] sm:h-[80vh] flex flex-col")}>
+          <div ref={containerRef} className={cn(
+            "w-full rounded-[26px] bg-[#212121] transition-shadow duration-200 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.15)] flex flex-col border border-white/5",
+            isExpanded ? "h-full p-4 sm:p-5 shadow-2xl" : "p-2.5 sm:px-3 sm:py-3"
+          )}>
+            <div className={cn("flex items-end gap-2 w-full", isExpanded && "flex-grow min-h-0")}>
+              
+              <button
+                ref={plusButtonRef}
+                type="button"
+                onClick={() => setIsOptionsMenuOpen((curr) => !curr)}
+                className={cn(
+                  "flex-shrink-0 size-8 sm:size-9 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-100 transition-colors",
+                  isOptionsMenuOpen && "rotate-45"
+                )}
+                aria-label="Add tools"
+              >
+                <Plus className="size-6 transition-transform duration-200" strokeWidth={2} />
+              </button>
+
+              {selectedToolMode === "image" && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedToolMode("chat")}
+                  className="flex shrink-0 items-center justify-center gap-2 h-9 px-3 rounded-full bg-transparent hover:bg-[#2f3542] text-[#82b4fb] font-medium text-[15px] transition-colors group"
+                >
+                  <div className="relative flex items-center justify-center size-5">
+                    <ImagePlus className="size-[18px] absolute transition-opacity duration-200 group-hover:opacity-0" strokeWidth={2} />
+                    <div className="absolute opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center size-5 bg-[#171717] rounded-full">
+                      <X className="size-3.5" strokeWidth={2.5} />
+                    </div>
+                  </div>
+                  <span>Image</span>
+                </button>
+              )}
+
+              {webSearchEnabled && (
+                <button
+                  type="button"
+                  onClick={() => setWebSearchEnabled(false)}
+                  className="flex shrink-0 items-center justify-center gap-2 h-9 px-3 rounded-full bg-transparent hover:bg-[#2f3542] text-[#82b4fb] font-medium text-[15px] transition-colors group"
+                >
+                  <div className="relative flex items-center justify-center size-5">
+                    <Globe className="size-[18px] absolute transition-opacity duration-200 group-hover:opacity-0" strokeWidth={2} />
+                    <div className="absolute opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center size-5 bg-[#171717] rounded-full">
+                      <X className="size-3.5" strokeWidth={2.5} />
+                    </div>
+                  </div>
+                  <span>Search</span>
+                </button>
+              )}
+
+              <div className={cn("relative flex-grow min-w-0 flex flex-col group/textwrapper", isExpanded && "h-full")}>
+                {isExpanded && (
+                  <div className="flex justify-between items-center mb-3 pb-2 border-b border-white/10 shrink-0">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Message Editor</span>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsExpanded(false)} 
+                      className="text-slate-400 hover:text-white transition-colors hover:bg-white/10 p-1.5 rounded-full"
+                      aria-label="Minimize editor"
+                    >
+                        <Minimize2 className="size-4" />
+                    </button>
+                  </div>
+                )}
+
+                <textarea
+                  ref={textareaRef}
+                  value={value}
+                  onChange={(e) => onChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  rows={1}
+                  placeholder="Message GARAS..."
+                  className={cn(
+                    "flex-grow w-full bg-transparent border-none outline-none text-slate-100 placeholder:text-slate-400 resize-none py-1.5 sm:py-2 scroll-smooth",
+                    "[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent",
+                    isExpanded ? "h-full max-h-none text-[16px] leading-[26px]" : "text-[15px] sm:text-[16px] leading-[22px] min-h-[24px] max-h-[300px]"
+                  )}
+                />
+
+                {!isExpanded && value.length > 50 && (
+                  <div className="absolute right-0 top-0 -mt-1 sm:-mt-2 opacity-0 group-hover/textwrapper:opacity-100 transition-opacity duration-200">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsExpanded(true)} 
+                      className="p-1.5 bg-[#2a2a2a] border border-white/10 rounded-lg shadow-sm text-slate-400 hover:text-white transition-colors"
+                      title="Expand editor"
+                    >
+                      <Maximize2 className="size-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-shrink-0 flex items-center">
+                {!hasText ? (
+                  <button type="button" className="size-8 sm:size-9 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-white transition-colors duration-200">
+                    <Mic className="size-[22px]" strokeWidth={2} />
+                  </button>
+                ) : (
+                  <button 
+                    type="submit" 
+                    disabled={isTyping || selectedToolMode === "image"}
+                    className="size-8 sm:size-9 rounded-full bg-white text-black flex items-center justify-center transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    <ArrowUp className="size-[22px]" strokeWidth={2.5} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
     </>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getAIModelOption, type AIProvider } from "@/lib/ai/model-catalog";
 import {
   createAiUsageLog,
   createStoredConversation,
@@ -13,6 +14,7 @@ import {
 } from "@/services/appwrite-chat-service";
 import { buildConversationSummary, estimateUsageCost, selectRecentMessages } from "@/lib/ai/usage-optimization";
 import { sendChatMessage } from "@/services/chat-service";
+import { useChatUIStore } from "@/stores/chat-ui-store";
 import type { ChatConversation, ChatMessage } from "@/types/chat";
 
 const seedConversations: ChatConversation[] = [];
@@ -25,21 +27,6 @@ const quickPrompts = [
   "Ii diyaari email shaqo oo xirfad leh",
 ];
 
-const STREAMING_STEP_DELAY_MS = 14;
-const STREAMING_TARGET_STEPS = 10;
-
-function buildStreamingChunks(text: string) {
-  const pieces = text.match(/\S+\s*/g) ?? [text];
-  const chunkSize = Math.max(1, Math.ceil(pieces.length / STREAMING_TARGET_STEPS));
-  const chunks: string[] = [];
-
-  for (let index = 0; index < pieces.length; index += chunkSize) {
-    chunks.push(pieces.slice(index, index + chunkSize).join(""));
-  }
-
-  return chunks;
-}
-
 export function useChatUI(userId?: string, preferredConversationId?: string) {
   const isAuthenticated = Boolean(userId);
   const [messages, setMessages] = useState<ChatMessage[]>(seedMessages);
@@ -49,7 +36,9 @@ export function useChatUI(userId?: string, preferredConversationId?: string) {
   const [isTyping, setIsTyping] = useState(false);
   const [isHydratingConversations, setIsHydratingConversations] = useState(false);
   const [isHydratingMessages, setIsHydratingMessages] = useState(false);
-  const [responseSource, setResponseSource] = useState<"gemini" | "openai" | "fallback">("fallback");
+  const selectedModelId = useChatUIStore((state) => state.selectedModelId);
+  const webSearchEnabled = useChatUIStore((state) => state.webSearchEnabled);
+  const [responseSource, setResponseSource] = useState<AIProvider | null>(null);
   const [responseModel, setResponseModel] = useState<string | null>(null);
   const [providerError, setProviderError] = useState<string | null>(null);
   const [streamingMessage, setStreamingMessage] = useState<ChatMessage | null>(null);
@@ -203,44 +192,9 @@ export function useChatUI(userId?: string, preferredConversationId?: string) {
     });
   }, []);
 
-  const streamAssistantMessage = useCallback(async (message: ChatMessage) => {
-    const streamId = activeStreamRef.current + 1;
-    activeStreamRef.current = streamId;
-    const chunks = buildStreamingChunks(message.content);
-
-    setStreamingMessage({
-      ...message,
-      content: "",
-      isStreaming: true,
-    });
-
-    let partialContent = "";
-
-    for (const chunk of chunks) {
-      if (activeStreamRef.current !== streamId) {
-        return false;
-      }
-
-      partialContent += chunk;
-      setStreamingMessage({
-        ...message,
-        content: partialContent,
-        isStreaming: true,
-      });
-
-      await new Promise((resolve) => window.setTimeout(resolve, STREAMING_STEP_DELAY_MS));
-    }
-
-    if (activeStreamRef.current !== streamId) {
-      return false;
-    }
-
-    setStreamingMessage(null);
-    return true;
-  }, []);
-
-  const sendMessage = useCallback(async () => {
-    const text = input.trim();
+  const sendMessage = useCallback(async (customText?: string | React.MouseEvent | React.KeyboardEvent, truncateHistoryId?: string) => {
+    const actualText = typeof customText === 'string' ? customText : input;
+    const text = actualText.trim();
     if (!text || isTyping) return;
 
     const userMessage: ChatMessage = {
@@ -250,12 +204,37 @@ export function useChatUI(userId?: string, preferredConversationId?: string) {
       createdAt: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+    let baseHistory = messages;
+    if (typeof truncateHistoryId === 'string') {
+      const idx = messages.findIndex(m => m.id === truncateHistoryId);
+      if (idx !== -1) {
+         baseHistory = messages.slice(0, Math.max(0, idx));
+      }
+    }
+
+    const historyForRequest = [...baseHistory, userMessage];
+    setMessages(historyForRequest);
+    
+    if (typeof customText !== 'string') {
+      setInput("");
+    }
     setIsTyping(true);
+    const streamId = activeStreamRef.current + 1;
+    activeStreamRef.current = streamId;
+    const streamingMessageId = crypto.randomUUID();
+    const selectedModel = getAIModelOption(selectedModelId);
+      const willSearchWeb = webSearchEnabled;
+    setStreamingMessage({
+      id: streamingMessageId,
+      role: "assistant",
+      content: "",
+      createdAt: new Date().toISOString(),
+      isStreaming: true,
+      searchingWeb: willSearchWeb,
+    });
 
     let persistedConversationId = activeConversationId;
-    const historyForRequest = [...messages, userMessage];
+
 
     if (persistedConversationId) {
       messageCacheRef.current[persistedConversationId] = historyForRequest;
@@ -265,74 +244,135 @@ export function useChatUI(userId?: string, preferredConversationId?: string) {
     const recentMessages = selectRecentMessages(historyForRequest);
 
     try {
+      const responsePromise = sendChatMessage({
+        messages: recentMessages,
+        summary: summaryForRequest || undefined,
+        modelId: selectedModelId,
+        useWebSearch: webSearchEnabled,
+      }, {
+        onMeta: (meta) => {
+          if (activeStreamRef.current !== streamId) {
+            return;
+          }
+
+          setResponseSource(meta.provider);
+          setResponseModel(meta.model);
+        },
+        onChunk: (chunk) => {
+          if (activeStreamRef.current !== streamId || !chunk) {
+            return;
+          }
+
+          setStreamingMessage((current) => {
+            if (!current || current.id !== streamingMessageId) {
+              return current;
+            }
+
+            return {
+              ...current,
+              content: `${current.content}${chunk}`,
+              isStreaming: true,
+            };
+          });
+        },
+      });
+
+      let persistenceConversationIdPromise = Promise.resolve<string | undefined>(persistedConversationId || undefined);
+
       if (isAuthenticated) {
         if (!persistedConversationId) {
-          const storedConversation = await createStoredConversation(text);
-          persistedConversationId = storedConversation.id;
-          await createStoredMessage(persistedConversationId, "user", userMessage.content);
-          messageCacheRef.current[persistedConversationId] = historyForRequest;
-          upsertConversationLocally(storedConversation);
-          setActiveConversationId(storedConversation.id);
+          persistenceConversationIdPromise = createStoredConversation(text)
+            .then(async (storedConversation) => {
+              persistedConversationId = storedConversation.id;
+              messageCacheRef.current[storedConversation.id] = historyForRequest;
+              upsertConversationLocally(storedConversation);
+              setActiveConversationId(storedConversation.id);
+              await createStoredMessage(storedConversation.id, "user", userMessage.content);
+              return storedConversation.id;
+            })
+            .catch((error) => {
+              console.error("Conversation creation failed:", error);
+              return undefined;
+            });
         } else {
-          await createStoredMessage(persistedConversationId, "user", userMessage.content);
+          persistenceConversationIdPromise = createStoredMessage(persistedConversationId, "user", userMessage.content)
+            .then(() => persistedConversationId)
+            .catch((error) => {
+              console.error("User message persistence failed:", error);
+              return persistedConversationId;
+            });
         }
       }
 
-      const response = await sendChatMessage({
-        messages: recentMessages,
-        summary: summaryForRequest || undefined,
-      });
+      const response = await responsePromise;
 
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
         content: response.message,
         createdAt: new Date().toISOString(),
+        grounded: response.grounded,
+        responseTemplate: response.responseTemplate,
+        sources: response.sources,
       };
-      setResponseSource(response.provider);
-      setResponseModel(response.model);
-      setProviderError(response.providerError ?? null);
 
-      const streamCompleted = await streamAssistantMessage(assistantMessage);
-
-      if (!streamCompleted) {
+      if (activeStreamRef.current !== streamId) {
         return;
       }
 
+      setResponseSource(response.provider);
+      setResponseModel(response.model);
+      setProviderError(null);
+      setStreamingMessage(null);
+
       const historyAfterReply = [...historyForRequest, assistantMessage];
+
+      setMessages(historyAfterReply);
 
       if (persistedConversationId) {
         messageCacheRef.current[persistedConversationId] = historyAfterReply;
       }
 
-      setMessages(historyAfterReply);
+      if (isAuthenticated) {
+        void persistenceConversationIdPromise.then((savedConversationId) => {
+          if (!savedConversationId) {
+            return;
+          }
 
-      if (isAuthenticated && persistedConversationId) {
-        await createStoredMessage(persistedConversationId, "assistant", assistantMessage.content);
-        const updatedConversation = await touchStoredConversation(persistedConversationId, {
-          latestUserText: text,
-          summary: buildConversationSummary(historyAfterReply),
-          messageCount: historyAfterReply.length,
-        });
-        upsertConversationLocally(updatedConversation);
+          messageCacheRef.current[savedConversationId] = historyAfterReply;
 
-        if (response.provider !== "fallback" && response.model && response.usage) {
-          await createAiUsageLog({
-            conversationId: persistedConversationId,
-            provider: response.provider,
-            model: response.model,
-            inputTokens: response.usage.inputTokens,
-            outputTokens: response.usage.outputTokens,
-            estimatedCost: estimateUsageCost(response.model, response.usage.inputTokens, response.usage.outputTokens),
+          void createStoredMessage(savedConversationId, "assistant", assistantMessage.content, {
+            grounded: assistantMessage.grounded,
+            sources: assistantMessage.sources,
           }).catch(() => undefined);
-        }
+          void touchStoredConversation(savedConversationId, {
+            latestUserText: text,
+            summary: buildConversationSummary(historyAfterReply),
+            messageCount: historyAfterReply.length,
+          })
+            .then((updatedConversation) => {
+              upsertConversationLocally(updatedConversation);
+            })
+            .catch(() => undefined);
+
+          if (response.model && response.usage) {
+            void createAiUsageLog({
+              conversationId: savedConversationId,
+              provider: response.provider,
+              model: response.model,
+              inputTokens: response.usage.inputTokens,
+              outputTokens: response.usage.outputTokens,
+              estimatedCost: estimateUsageCost(response.model, response.usage.inputTokens, response.usage.outputTokens),
+            }).catch(() => undefined);
+          }
+        });
       }
-    } catch {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Wax yar ayaa khaldamay. Fadlan isku day mar kale.";
       const assistantErrorMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content:
-          "### Cilad\n\nWaan ku fahmay, laakiin hadda waxaa jira cilad farsamo oo ku timid adeegga jawaabta. Fadlan mar kale isku day.",
+        content: `### Cilad\n\n${errorMessage}`,
         createdAt: new Date().toISOString(),
       };
 
@@ -344,9 +384,9 @@ export function useChatUI(userId?: string, preferredConversationId?: string) {
 
       setMessages(failedHistory);
       setStreamingMessage(null);
-      setResponseSource("fallback");
+      setResponseSource(null);
       setResponseModel(null);
-      setProviderError("Wax yar ayaa khaldamay. Fadlan isku day mar kale.");
+      setProviderError(errorMessage);
 
       if (isAuthenticated && persistedConversationId) {
         await createStoredMessage(persistedConversationId, "assistant", assistantErrorMessage.content).catch(() => undefined);
@@ -363,7 +403,7 @@ export function useChatUI(userId?: string, preferredConversationId?: string) {
     } finally {
       setIsTyping(false);
     }
-  }, [activeConversationId, input, isAuthenticated, isTyping, messages, upsertConversationLocally]);
+  }, [activeConversationId, input, isAuthenticated, isTyping, messages, selectedModelId, upsertConversationLocally, webSearchEnabled]);
 
   const startNewChat = useCallback(() => {
     resetConversationState();

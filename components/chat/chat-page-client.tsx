@@ -9,6 +9,8 @@ import { isAppwriteConfigured } from "@/lib/appwrite/client";
 import { getAuthErrorMessage, getCurrentUser, logoutCurrentUser, type AuthUser } from "@/services/auth-service";
 
 const GUEST_MESSAGE_LIMIT = 30;
+const CHAT_ROOT_PATH = "/chat";
+const CHAT_CONVERSATION_PREFIX = "/chat/c";
 
 const authPrompts = {
   history: {
@@ -99,8 +101,8 @@ export function ChatPageClient({ initialConversationId }: ChatPageClientProps) {
     }
 
     if (!isAuthenticated) {
-      if (pathname.startsWith("/c/")) {
-        router.replace("/");
+      if (pathname.startsWith(CHAT_CONVERSATION_PREFIX)) {
+        router.replace(CHAT_ROOT_PATH);
       }
       return;
     }
@@ -113,12 +115,12 @@ export function ChatPageClient({ initialConversationId }: ChatPageClientProps) {
 
     if (conversations.length > 0 && !conversations.some((conversation) => conversation.id === initialConversationId)) {
       startNewChat();
-      router.replace("/");
+      router.replace(CHAT_ROOT_PATH);
     }
   }, [conversations, initialConversationId, isAuthenticated, isHydratingConversations, router, startNewChat]);
 
   useEffect(() => {
-    if (!isAuthenticated || pathname !== "/") {
+    if (!isAuthenticated || pathname !== CHAT_ROOT_PATH) {
       previousConversationIdRef.current = stats.activeConversationId;
       return;
     }
@@ -132,7 +134,7 @@ export function ChatPageClient({ initialConversationId }: ChatPageClientProps) {
       activeConversationId !== previousConversationId &&
       messages.some((message) => message.role === "user")
     ) {
-      router.replace(`/c/${activeConversationId}`);
+      router.replace(`${CHAT_CONVERSATION_PREFIX}/${activeConversationId}`);
     }
   }, [isAuthenticated, messages, pathname, router, stats.activeConversationId]);
 
@@ -149,14 +151,23 @@ export function ChatPageClient({ initialConversationId }: ChatPageClientProps) {
     await sendMessage();
   };
 
+  const handleEditSubmit = async (messageId: string, text: string) => {
+    if (!isAuthenticated && guestMessagesRemaining <= 0) {
+      openAuthPrompt("limit");
+      return;
+    }
+
+    await sendMessage(text, messageId);
+  };
+
   const handleNewChat = () => {
     if (!isAuthenticated) {
       openAuthPrompt("newChat");
       return;
     }
 
-    if (pathname !== "/") {
-      router.push("/");
+    if (pathname !== CHAT_ROOT_PATH) {
+      router.push(CHAT_ROOT_PATH);
     }
 
     startNewChat();
@@ -168,8 +179,8 @@ export function ChatPageClient({ initialConversationId }: ChatPageClientProps) {
       return;
     }
 
-    if (pathname !== `/c/${id}`) {
-      router.push(`/c/${id}`);
+    if (pathname !== `${CHAT_CONVERSATION_PREFIX}/${id}`) {
+      router.push(`${CHAT_CONVERSATION_PREFIX}/${id}`);
     }
 
     setActiveConversationId(id);
@@ -181,8 +192,8 @@ export function ChatPageClient({ initialConversationId }: ChatPageClientProps) {
       queryClient.setQueryData(["auth-user"], null);
       setAuthPromptKey(null);
       startNewChat();
-      if (pathname !== "/") {
-        router.replace("/");
+      if (pathname !== CHAT_ROOT_PATH) {
+        router.replace(CHAT_ROOT_PATH);
       }
     } catch (error) {
       console.error(getAuthErrorMessage(error));
@@ -217,6 +228,7 @@ export function ChatPageClient({ initialConversationId }: ChatPageClientProps) {
       providerError={providerError}
       onInputChange={setInput}
       onSend={handleSend}
+      onEditSubmit={handleEditSubmit}
       onNewChat={handleNewChat}
       onSelectConversation={handleSelectConversation}
       onRenameConversation={renameConversation}

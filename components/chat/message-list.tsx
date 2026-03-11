@@ -13,9 +13,10 @@ interface MessageListProps {
   messages: ChatMessage[];
   streamingMessage: ChatMessage | null;
   isTyping: boolean;
+  onEditSubmit?: (messageId: string, text: string) => void;
 }
 
-export function MessageList({ activeConversationId, messages, streamingMessage, isTyping }: MessageListProps) {
+export function MessageList({ activeConversationId, messages, streamingMessage, isTyping, onEditSubmit }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -62,6 +63,8 @@ export function MessageList({ activeConversationId, messages, streamingMessage, 
     pendingConversationScrollRef.current = Boolean(activeConversationId);
 
     if (tailSpacerHeight !== 0) {
+      // @ts-ignore
+    // eslint-disable-next-line react-hooks/set-state-in-effect
       setTailSpacerHeight(0);
     }
   }, [activeConversationId, tailSpacerHeight]);
@@ -141,7 +144,9 @@ export function MessageList({ activeConversationId, messages, streamingMessage, 
 
     if (!container || !content || !target) {
       if (tailSpacerHeight !== 0) {
-        setTailSpacerHeight(0);
+        // @ts-ignore
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTailSpacerHeight(0);
       }
       return;
     }
@@ -182,12 +187,11 @@ export function MessageList({ activeConversationId, messages, streamingMessage, 
                 messageRefs.current[message.id] = element;
               }}
             >
-              <MessageBubble message={message} />
-            </div>
-          ))}
+                <MessageBubble message={message} onEditSubmit={onEditSubmit} />
+              </div>
+            ))}
 
-          {streamingMessage && <MessageBubble message={streamingMessage} />}
-
+            {streamingMessage && <MessageBubble message={streamingMessage} onEditSubmit={onEditSubmit} />}
           {isTyping && !streamingMessage && (
             <article className="message-appear flex min-w-0 w-full gap-3 overflow-x-hidden">
               <div className="mt-1 flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-sky-300/15 bg-sky-300/10 ring-1 ring-sky-300/10">

@@ -127,7 +127,7 @@ export default function LoginPage() {
 
       <div className="mt-5 text-sm text-slate-400">
         Ama ku laabo{" "}
-        <Link href="/" className="font-medium text-sky-300 hover:text-sky-200">
+        <Link href="/home" className="font-medium text-sky-300 hover:text-sky-200">
           bogga hore
         </Link>
         .

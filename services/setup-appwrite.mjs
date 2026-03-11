@@ -123,6 +123,13 @@ async function ensureIntegerAttribute(collectionId, key, required, min = undefin
   );
 }
 
+async function ensureBooleanAttribute(collectionId, key, required, defaultValue = undefined) {
+  await withConflictGuard(
+    () => databases.createBooleanAttribute(databaseId, collectionId, key, required, defaultValue),
+    `Attribute ${collectionId}.${key}`
+  );
+}
+
 async function ensureFloatAttribute(collectionId, key, required, min = undefined, max = undefined, defaultValue = undefined) {
   await withConflictGuard(
     () => databases.createFloatAttribute(databaseId, collectionId, key, required, min, max, defaultValue),
@@ -185,10 +192,12 @@ async function setupMessagesCollection() {
   await ensureStringAttribute(messagesCollectionId, "conversationId", 64, true);
   await ensureStringAttribute(messagesCollectionId, "role", 32, true);
   await ensureStringAttribute(messagesCollectionId, "content", 20000, true);
+  await ensureBooleanAttribute(messagesCollectionId, "grounded", false);
+  await ensureStringAttribute(messagesCollectionId, "sourcesJson", 12000, false);
   await ensureIntegerAttribute(messagesCollectionId, "tokenEstimate", false, 0, 100000);
   await ensureDatetimeAttribute(messagesCollectionId, "createdAt", true);
 
-  await waitForAttributes(messagesCollectionId, ["userId", "conversationId", "role", "content", "tokenEstimate", "createdAt"]);
+  await waitForAttributes(messagesCollectionId, ["userId", "conversationId", "role", "content", "grounded", "sourcesJson", "tokenEstimate", "createdAt"]);
 
   await ensureIndex(messagesCollectionId, "message_conversation_created", ["conversationId", "createdAt"], [ORDER_ASC, ORDER_DESC]);
   await ensureIndex(messagesCollectionId, "message_user_created", ["userId", "createdAt"], [ORDER_ASC, ORDER_DESC]);
