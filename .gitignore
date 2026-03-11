@@ -1,0 +1,30 @@
+    # OS files
+    .DS_Store
+    Thumbs.db
+
+    # Next.js
+    .next/
+    out/
+
+    # Dependencies
+    node_modules/
+    jspm_packages/
+    venv/
+
+    # Build output
+    dist/
+    build/
+    *.exe
+    *.o
+
+    # Logs
+    *.log
+
+    # Environment variables
+    .env
+    .env.local
+
+    # IDE settings
+    .vscode/
+    .idea/
+
