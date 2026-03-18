@@ -143,6 +143,27 @@ export function ChatShell({
   const [enableLayoutTransitions, setEnableLayoutTransitions] = useState(false);
 
   useEffect(() => {
+    const viewport = window.visualViewport;
+
+    if (!viewport) {
+      return;
+    }
+
+    const syncVisualViewportHeight = () => {
+      document.documentElement.style.setProperty("--vvh", `${viewport.height}px`);
+    };
+
+    syncVisualViewportHeight();
+    viewport.addEventListener("resize", syncVisualViewportHeight);
+    viewport.addEventListener("scroll", syncVisualViewportHeight);
+
+    return () => {
+      viewport.removeEventListener("resize", syncVisualViewportHeight);
+      viewport.removeEventListener("scroll", syncVisualViewportHeight);
+    };
+  }, []);
+
+  useEffect(() => {
     if (useChatUIStore.persist.hasHydrated()) {
       const id = requestAnimationFrame(() => setEnableLayoutTransitions(true));
       return () => cancelAnimationFrame(id);
@@ -225,7 +246,7 @@ export function ChatShell({
         } as React.CSSProperties
       }
       className={cn(
-        "grid h-[100dvh] grid-cols-1 overflow-hidden bg-transparent md:h-screen md:[grid-template-columns:var(--sidebar-columns)]",
+        "grid h-[var(--vvh,100dvh)] grid-cols-1 overflow-hidden bg-transparent md:h-screen md:[grid-template-columns:var(--sidebar-columns)]",
         enableLayoutTransitions && "md:transition-[grid-template-columns] md:duration-200 md:ease-out"
       )}
     >
@@ -366,7 +387,9 @@ export function ChatShell({
             {showWebStatus && (
               <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 shadow-sm backdrop-blur-md border", latestAssistantMessage?.grounded ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : "bg-sky-500/10 text-sky-300 border-sky-500/20")}>
                 <Globe className="size-3.5" />
-                <span className="text-xs font-medium">{latestAssistantMessage?.grounded ? "Web verified" : "Web search active"}</span>
+                <span className="hidden text-xs font-medium sm:inline">
+                  {latestAssistantMessage?.grounded ? "Web verified" : "Web search active"}
+                </span>
               </span>
             )}
             
