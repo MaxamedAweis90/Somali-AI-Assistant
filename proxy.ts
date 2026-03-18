@@ -59,7 +59,7 @@ export function proxy(request: NextRequest) {
   if (pathname === "/") {
     const destination = request.nextUrl.clone();
     destination.pathname = isChatHost ? "/chat" : "/home";
-    return NextResponse.rewrite(destination);
+    return NextResponse.redirect(destination);
   }
 
   if (isChatHost && pathname.startsWith("/c/")) {

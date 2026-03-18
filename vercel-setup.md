@@ -27,6 +27,10 @@ Create two Vercel projects pointing to the **same GitHub repo**:
 Notes:
 - The code supports chat hostnames that start with `chat.` (custom domains) **or** `chat-` (Vercel-style names like `chat-garas.vercel.app`).
 - Both projects can share the same AI/Appwrite env vars.
+- `/` will redirect to `/home` (landing) or `/chat` (chat) so the browser URL matches the active app.
+
+Auth note (Appwrite):
+- If you use Appwrite OAuth providers or platform allowlists, make sure both domains are allowed (landing + chat). Otherwise login callbacks can fail or appear as a blank/partial screen.
 
 ## 2. Using Vercel default domains
 
