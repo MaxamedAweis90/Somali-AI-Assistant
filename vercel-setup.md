@@ -8,36 +8,58 @@
 4. Add the required environment variables for your AI providers and Appwrite configuration.
 5. Deploy the project.
 
+### Option A (Recommended): Two Vercel projects from one repo
+
+This is the most reliable way to have two different hostnames (one for landing, one for chat) without buying a custom domain.
+
+Create two Vercel projects pointing to the **same GitHub repo**:
+
+1. **Landing project** (example domain: `garas.vercel.app`)
+	 - Environment variables:
+		 - `APP_VARIANT=landing`
+		 - (Optional) `CHAT_BASE_URL=https://chat-garas.vercel.app` (used to redirect `/chat` and `/c/...` to the chat project)
+
+2. **Chat project** (example domain: `chat-garas.vercel.app`)
+	 - Environment variables:
+		 - `APP_VARIANT=chat`
+		 - (Optional) `LANDING_BASE_URL=https://garas.vercel.app` (used to redirect `/home` back to the landing project)
+
+Notes:
+- The code supports chat hostnames that start with `chat.` (custom domains) **or** `chat-` (Vercel-style names like `chat-garas.vercel.app`).
+- Both projects can share the same AI/Appwrite env vars.
+
 ## 2. Using Vercel default domains
 
-The routing code is prepared for these production hostnames:
+With Vercel's default `*.vercel.app` domain, a project typically gets **one** production hostname:
 
-- `garas.vercel.app`
-- `chat.garas.vercel.app`
+- `YOUR_PROJECT_NAME.vercel.app`
+
+Because you generally cannot add arbitrary subdomains under `vercel.app` (for example `chat.garas.vercel.app`) to the same project, the **reliable** way to reach the chat on the default domain is path-based routing:
+
+- `https://YOUR_PROJECT_NAME.vercel.app/chat`
 
 The root route checks the incoming host and sends users to `/home` or `/chat`, while `proxy.ts` rewrites root requests so the correct app section is rendered.
 
 ## 3. Adding the chat subdomain
 
-In Vercel:
+If you want `chat.` subdomain routing (so the chat opens at `https://chat.YOUR_DOMAIN`), use a **custom domain**:
 
-1. Open the project.
-2. Go to **Settings**.
-3. Open **Domains**.
-4. Add `chat.garas.vercel.app` to the same project.
+1. Buy / use a domain you control (example: `garas.ai`).
+2. In Vercel → **Settings** → **Domains**, add both:
+	- `garas.ai`
+	- `chat.garas.ai`
+3. Follow Vercel's DNS instructions for the apex and subdomain.
 
-Important note:
-
-Vercel's default `vercel.app` hostname behavior can vary by account, project naming, and available aliases. If Vercel does not allow `chat.garas.vercel.app` as an additional domain on the default hostname, use a custom domain such as `garas.ai` and `chat.garas.ai` for production.
+Why this matters: the code checks `hostname.startsWith("chat.")`. That will work with custom domains like `chat.garas.ai`, but Vercel usually won’t let you create `chat.garas.vercel.app` under the default `vercel.app` namespace.
 
 ## 4. Testing routing
 
 After deployment, verify these cases:
 
-1. Visit `https://garas.vercel.app` and confirm it loads the landing page.
-2. Visit `https://garas.vercel.app/home` and confirm it loads the landing page directly.
-3. Visit `https://garas.vercel.app/chat` and confirm it loads the chat UI.
-4. Visit `https://chat.garas.vercel.app` and confirm it opens the chat application.
+1. Visit `https://YOUR_PROJECT_NAME.vercel.app` and confirm it loads the landing page.
+2. Visit `https://YOUR_PROJECT_NAME.vercel.app/home` and confirm it loads the landing page directly.
+3. Visit `https://YOUR_PROJECT_NAME.vercel.app/chat` and confirm it loads the chat UI.
+4. (Custom domain) Visit `https://chat.YOUR_DOMAIN` and confirm it opens the chat application.
 5. Send a request to `/api/chat` and confirm the API still responds.
 
 ## 5. Future upgrade

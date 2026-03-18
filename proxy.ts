@@ -1,6 +1,14 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
+type AppVariant = "auto" | "landing" | "chat";
+
+function resolveAppVariant(value: string | undefined): AppVariant {
+  const normalized = (value ?? "auto").trim().toLowerCase();
+  if (normalized === "landing" || normalized === "chat") return normalized;
+  return "auto";
+}
+
 function resolveHostname(request: NextRequest) {
   const forwardedHost = request.headers.get("x-forwarded-host");
   const host = forwardedHost ?? request.headers.get("host") ?? "";
@@ -14,8 +22,13 @@ function isStaticAsset(pathname: string) {
 
 export function proxy(request: NextRequest) {
   const hostname = resolveHostname(request);
-  const isChatHost = hostname.startsWith("chat.");
+  const variant = resolveAppVariant(process.env.APP_VARIANT);
+  const isChatHostname = hostname.startsWith("chat.") || hostname.startsWith("chat-");
+  const isChatHost = variant === "chat" ? true : variant === "landing" ? false : isChatHostname;
   const { pathname } = request.nextUrl;
+
+  const chatBaseUrl = process.env.CHAT_BASE_URL;
+  const landingBaseUrl = process.env.LANDING_BASE_URL;
 
   if (
     pathname.startsWith("/api") ||
@@ -26,6 +39,21 @@ export function proxy(request: NextRequest) {
     isStaticAsset(pathname)
   ) {
     return NextResponse.next();
+  }
+
+  if (variant === "landing" && chatBaseUrl) {
+    if (pathname === "/chat" || pathname.startsWith("/chat/") || pathname.startsWith("/c/")) {
+      const target = new URL(chatBaseUrl);
+      target.pathname = pathname === "/chat" ? "/" : pathname;
+      target.search = request.nextUrl.search;
+      return NextResponse.redirect(target);
+    }
+  }
+
+  if (variant === "chat" && landingBaseUrl) {
+    if (pathname === "/home" || pathname.startsWith("/home/")) {
+      return NextResponse.redirect(new URL(pathname, landingBaseUrl));
+    }
   }
 
   if (pathname === "/") {
