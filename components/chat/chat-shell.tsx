@@ -78,6 +78,7 @@ interface ChatShellProps {
   onCloseAuthPrompt: () => void;
   onRequireAuth: () => void;
   onLogout?: () => void;
+  onUpdateProfile?: (data: { name: string; username: string }) => Promise<void>;
 }
 
 export function ChatShell({
@@ -111,6 +112,7 @@ export function ChatShell({
   onCloseAuthPrompt,
   onRequireAuth,
   onLogout,
+  onUpdateProfile,
 }: ChatShellProps) {
   const templatePopoverRef = useRef<HTMLDivElement>(null);
   const modelPopoverRef = useRef<HTMLDivElement>(null);
@@ -199,6 +201,7 @@ export function ChatShell({
           currentUserEmail={currentUserEmail}
           guestMessagesRemaining={guestMessagesRemaining}
           onRequireAuth={onRequireAuth}
+          onUpdateProfile={onUpdateProfile}
           onLogout={onLogout}
         />
       </div>

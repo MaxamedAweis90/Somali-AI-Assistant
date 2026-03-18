@@ -199,7 +199,7 @@ export function MessageInput({
         <div
           ref={optionsMenuRef}
           className={cn(
-            "fixed z-[200] rounded-[16px] border border-white/5 bg-[#2f2f2f] shadow-2xl animate-in fade-in zoom-in-95 text-slate-100 flex flex-col p-1.5",
+            "fixed z-200 rounded-[16px] border border-white/5 bg-[#2f2f2f] shadow-2xl animate-in fade-in zoom-in-95 text-slate-100 flex flex-col p-1.5",
             optionsMenuPosition.bottom !== undefined ? "origin-bottom-left" : "origin-top-left"
           )}
           style={{
@@ -225,7 +225,7 @@ export function MessageInput({
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <Globe className={cn("size-[18px]", webSearchEnabled ? "text-emerald-400" : "text-slate-400")} />
+                  <Globe className={cn("size-4.5", webSearchEnabled ? "text-emerald-400" : "text-slate-400")} />
                   <span>Search web</span>
                 </div>
                 {webSearchEnabled && <Check className="size-4 text-emerald-400" />}
@@ -244,7 +244,7 @@ export function MessageInput({
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <ImagePlus className={cn("size-[18px]", selectedToolMode === "image" ? "text-sky-400" : "text-slate-400")} />
+                  <ImagePlus className={cn("size-4.5", selectedToolMode === "image" ? "text-sky-400" : "text-slate-400")} />
                   <span>Create image</span>
                 </div>
                 {selectedToolMode === "image" && <Check className="size-4 text-sky-400" />}
@@ -262,14 +262,14 @@ export function MessageInput({
       
       {isExpanded && (
         <div 
-          className="fixed inset-0 z-[140] bg-black/60 backdrop-blur-[2px] animate-in fade-in duration-200" 
+          className="fixed inset-0 z-140 bg-black/60 backdrop-blur-[2px] animate-in fade-in duration-200" 
           onClick={() => setIsExpanded(false)} 
         />
       )}
 
       <div className={cn(
         "w-full transition-all flex justify-center", 
-        isExpanded ? "fixed inset-0 z-[150] items-center p-4 sm:p-8 md:p-12 lg:p-20 pointer-events-none fade-in duration-300" : "pb-4",
+        isExpanded ? "fixed inset-0 z-150 items-center p-4 sm:p-8 md:p-12 lg:p-20 pointer-events-none fade-in duration-300" : "pb-4",
         !isExpanded && (variant === "centered" ? "max-w-3xl mx-auto px-4" : "px-4 sm:px-6 lg:px-8")
       )}>
         <form onSubmit={handleSubmit} className={cn("w-full relative shadow-sm max-w-4xl pointer-events-auto", isExpanded && "h-[85vh] sm:h-[80vh] flex flex-col")}>
@@ -277,14 +277,14 @@ export function MessageInput({
             "w-full rounded-[26px] bg-[#212121] transition-shadow duration-200 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.15)] flex flex-col border border-white/5",
             isExpanded ? "h-full p-4 sm:p-5 shadow-2xl" : "p-2.5 sm:px-3 sm:py-3"
           )}>
-            <div className={cn("flex items-end gap-2 w-full", isExpanded && "flex-grow min-h-0")}>
+            <div className={cn("flex items-end gap-2 w-full", isExpanded && "grow min-h-0")}>
               
               <button
                 ref={plusButtonRef}
                 type="button"
                 onClick={() => setIsOptionsMenuOpen((curr) => !curr)}
                 className={cn(
-                  "flex-shrink-0 size-8 sm:size-9 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-100 transition-colors",
+                  "shrink-0 size-8 sm:size-9 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-100 transition-colors",
                   isOptionsMenuOpen && "rotate-45"
                 )}
                 aria-label="Add tools"
@@ -299,7 +299,7 @@ export function MessageInput({
                   className="flex shrink-0 items-center justify-center gap-2 h-9 px-3 rounded-full bg-transparent hover:bg-[#2f3542] text-[#82b4fb] font-medium text-[15px] transition-colors group"
                 >
                   <div className="relative flex items-center justify-center size-5">
-                    <ImagePlus className="size-[18px] absolute transition-opacity duration-200 group-hover:opacity-0" strokeWidth={2} />
+                    <ImagePlus className="size-4.5 absolute transition-opacity duration-200 group-hover:opacity-0" strokeWidth={2} />
                     <div className="absolute opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center size-5 bg-[#171717] rounded-full">
                       <X className="size-3.5" strokeWidth={2.5} />
                     </div>
@@ -315,7 +315,7 @@ export function MessageInput({
                   className="flex shrink-0 items-center justify-center gap-2 h-9 px-3 rounded-full bg-transparent hover:bg-[#2f3542] text-[#82b4fb] font-medium text-[15px] transition-colors group"
                 >
                   <div className="relative flex items-center justify-center size-5">
-                    <Globe className="size-[18px] absolute transition-opacity duration-200 group-hover:opacity-0" strokeWidth={2} />
+                    <Globe className="size-4.5 absolute transition-opacity duration-200 group-hover:opacity-0" strokeWidth={2} />
                     <div className="absolute opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center size-5 bg-[#171717] rounded-full">
                       <X className="size-3.5" strokeWidth={2.5} />
                     </div>
@@ -324,7 +324,7 @@ export function MessageInput({
                 </button>
               )}
 
-              <div className={cn("relative flex-grow min-w-0 flex flex-col group/textwrapper", isExpanded && "h-full")}>
+              <div className={cn("relative grow min-w-0 flex flex-col group/textwrapper", isExpanded && "h-full")}>
                 {isExpanded && (
                   <div className="flex justify-between items-center mb-3 pb-2 border-b border-white/10 shrink-0">
                     <span className="text-xs font-semibold uppercase tracking-widest text-slate-400">Message Editor</span>
@@ -347,9 +347,9 @@ export function MessageInput({
                   rows={1}
                   placeholder="Message GARAS..."
                   className={cn(
-                    "flex-grow w-full bg-transparent border-none outline-none text-slate-100 placeholder:text-slate-400 resize-none py-1.5 sm:py-2 scroll-smooth",
+                    "grow w-full bg-transparent border-none outline-none text-slate-100 placeholder:text-slate-400 resize-none py-1.5 sm:py-2 scroll-smooth",
                     "[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-white/10 hover:[&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent",
-                    isExpanded ? "h-full max-h-none text-[16px] leading-[26px]" : "text-[15px] sm:text-[16px] leading-[22px] min-h-[24px] max-h-[300px]"
+                    isExpanded ? "h-full max-h-none text-[16px] leading-6.5" : "text-[15px] sm:text-[16px] leading-5.5 min-h-6 max-h-75"
                   )}
                 />
 
@@ -367,10 +367,10 @@ export function MessageInput({
                 )}
               </div>
 
-              <div className="flex-shrink-0 flex items-center">
+              <div className="shrink-0 flex items-center">
                 {!hasText ? (
                   <button type="button" className="size-8 sm:size-9 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-white transition-colors duration-200">
-                    <Mic className="size-[22px]" strokeWidth={2} />
+                    <Mic className="size-5.5" strokeWidth={2} />
                   </button>
                 ) : (
                   <button 
@@ -378,7 +378,7 @@ export function MessageInput({
                     disabled={isTyping || selectedToolMode === "image"}
                     className="size-8 sm:size-9 rounded-full bg-white text-black flex items-center justify-center transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
                   >
-                    <ArrowUp className="size-[22px]" strokeWidth={2.5} />
+                    <ArrowUp className="size-5.5" strokeWidth={2.5} />
                   </button>
                 )}
               </div>

@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowLeftRight, Check, ChevronLeft, ChevronRight, LogOut, MessageSquarePlus, Pencil, Search, Trash2, UserCircle2, X } from "lucide-react";
+import { ArrowLeftRight, Check, ChevronLeft, ChevronRight, MessageSquarePlus, Pencil, Search, Trash2, UserCircle2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { UserProfile } from "./user-profile";
 import type { ChatConversation } from "@/types/chat";
 import { cn } from "@/lib/utils";
 
@@ -19,9 +20,11 @@ interface ChatSidebarProps {
   isAuthenticated: boolean;
   currentUserName?: string;
   currentUserEmail?: string;
+  currentUserAvatar?: string;
   guestMessagesRemaining: number;
   onRequireAuth: () => void;
   onLogout?: () => void;
+  onUpdateProfile?: (data: { name: string; username: string }) => Promise<void>;
 }
 
 export function ChatSidebar({
@@ -36,9 +39,11 @@ export function ChatSidebar({
   isAuthenticated,
   currentUserName,
   currentUserEmail,
+  currentUserAvatar,
   guestMessagesRemaining,
   onRequireAuth,
   onLogout,
+  onUpdateProfile
 }: ChatSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
@@ -385,75 +390,55 @@ export function ChatSidebar({
         )}
       </div>
 
-      <div className={cn("mt-3 rounded-2xl border border-white/10 bg-white/4", isCollapsed ? "p-2" : "p-3")}>
-        {isCollapsed ? (
-          <div className="flex items-center justify-center">
-            {isAuthenticated ? (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onLogout?.();
-                }}
-                title="Log out"
-                className="inline-flex size-10 items-center justify-center rounded-xl border border-white/10 bg-white/4 text-slate-300 transition hover:bg-white/8 hover:text-white"
-                aria-label="Log out"
-              >
-                <LogOut className="size-4" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRequireAuth();
-                }}
-                title="Soo gal"
-                className="inline-flex size-10 items-center justify-center rounded-xl border border-white/10 bg-white/4 text-slate-300 transition hover:bg-white/8 hover:text-white"
-                aria-label="Soo gal"
-              >
-                <UserCircle2 className="size-4" />
-              </button>
-            )}
-          </div>
+      <div className="mt-2">
+        {isAuthenticated ? (
+          <UserProfile 
+            user={{
+              name: currentUserName,
+              email: currentUserEmail,
+              avatar: currentUserAvatar,
+              username: currentUserName?.toLowerCase().replace(/\s+/g, '') // Fallback username generation
+            }}
+            isCollapsed={isCollapsed}
+            onLogout={onLogout}
+            onUpdateProfile={onUpdateProfile}
+          />
         ) : (
-          <div className="flex items-center justify-between gap-2">
-            <UserCircle2 className="size-5 text-slate-400" />
-            {isAuthenticated ? (
-              <div>
-                <p className="max-w-35 truncate text-sm font-medium text-slate-100">{currentUserName}</p>
-                <p className="max-w-35 truncate text-xs text-slate-400">{currentUserEmail}</p>
+          <div className={cn("rounded-2xl border border-white/10 bg-white/4", isCollapsed ? "p-2" : "p-3")}>
+             {isCollapsed ? (
+              <div className="flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRequireAuth();
+                  }}
+                  title="Soo gal"
+                  className="inline-flex size-10 items-center justify-center rounded-xl border border-white/10 bg-white/4 text-slate-300 transition hover:bg-white/8 hover:text-white"
+                  aria-label="Soo gal"
+                >
+                  <UserCircle2 className="size-4" />
+                </button>
               </div>
             ) : (
-              <div>
-                <p className="text-sm font-medium text-slate-100">Marti</p>
-                <p className="text-xs text-slate-400">Ku gal si chats-ka loo kaydiyo</p>
-              </div>
-            )}
+              <div className="flex items-center justify-between gap-2">
+                <UserCircle2 className="size-5 text-slate-400" />
+                <div>
+                  <p className="text-sm font-medium text-slate-100">Marti</p>
+                  <p className="text-xs text-slate-400">Ku gal si chats-ka loo kaydiyo</p>
+                </div>
 
-            {isAuthenticated ? (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onLogout?.();
-                }}
-                className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/6 hover:text-slate-100"
-                aria-label="Log out"
-              >
-                <LogOut className="size-4" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRequireAuth();
-                }}
-                className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-white/10 px-3 text-xs text-slate-200 transition hover:bg-white/6"
-              >
-                Soo gal
-              </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRequireAuth();
+                  }}
+                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-white/10 px-3 text-xs text-slate-200 transition hover:bg-white/6"
+                >
+                  Soo gal
+                </button>
+              </div>
             )}
           </div>
         )}

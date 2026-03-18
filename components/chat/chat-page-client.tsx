@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ChatShell } from "@/components/chat/chat-shell";
 import { useChatUI } from "@/hooks/use-chat-ui";
 import { isAppwriteConfigured } from "@/lib/appwrite/client";
-import { getAuthErrorMessage, getCurrentUser, logoutCurrentUser, type AuthUser } from "@/services/auth-service";
+import { getAuthErrorMessage, getCurrentUser, logoutCurrentUser, updateUser, type AuthUser } from "@/services/auth-service";
 
 const GUEST_MESSAGE_LIMIT = 30;
 const CHAT_ROOT_PATH = "/chat";
@@ -200,6 +200,15 @@ export function ChatPageClient({ initialConversationId }: ChatPageClientProps) {
     }
   };
 
+  const handleUpdateProfile = async (data: { name: string; username: string }) => {
+    try {
+      await updateUser(data);
+      await queryClient.invalidateQueries({ queryKey: ["auth-user"] });
+    } catch (error) {
+      console.error("Failed to update profile", error);
+    }
+  };
+
   if (authError) {
     return (
       <main className="flex min-h-screen items-center justify-center px-6 py-12 text-center">
@@ -244,6 +253,7 @@ export function ChatPageClient({ initialConversationId }: ChatPageClientProps) {
       onCloseAuthPrompt={() => setAuthPromptKey(null)}
       onRequireAuth={() => openAuthPrompt("history")}
       onLogout={handleLogout}
+      onUpdateProfile={handleUpdateProfile}
     />
   );
 }

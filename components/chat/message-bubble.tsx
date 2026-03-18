@@ -43,7 +43,7 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
         </button>
       </div>
       <div className="overflow-x-auto p-4 text-[13.5px] leading-relaxed chat-scrollbar-soft w-full">
-        <pre className="!bg-transparent !p-0 !m-0 w-full max-w-full">
+        <pre className="bg-transparent! p-0! m-0! w-full max-w-full">
           <code className={cn("font-mono text-slate-300 min-w-full block", className)} {...props}>
             {children}
           </code>
@@ -223,7 +223,7 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
                       <Globe className="size-3.5 text-sky-400" />
                       ISHA XOGTA (SOURCES)
                     </div>
-                    <div className="flex overflow-x-auto gap-2.5 pb-3 chat-scrollbar-soft w-[100%] max-w-[85vw] snap-x">
+                    <div className="flex overflow-x-auto gap-2.5 pb-3 chat-scrollbar-soft w-full max-w-[85vw] snap-x">
                       {message.sources?.map((source, index) => (
                         <a
                           key={source.url}
@@ -231,7 +231,7 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
                           target="_blank"
                           rel="noreferrer"
                           title={source.title}
-                          className="group/source flex flex-col justify-between w-[160px] min-w-[160px] sm:w-[180px] sm:min-w-[180px] h-[76px] shrink-0 snap-start rounded-[14px] border border-white/10 bg-[#2f2f2f] p-3 transition-all hover:bg-[#383838] hover:border-white/20 text-left no-underline relative"
+                          className="group/source flex flex-col justify-between w-40 min-w-40 sm:w-45 sm:min-w-45 h-19 shrink-0 snap-start rounded-[14px] border border-white/10 bg-[#2f2f2f] p-3 transition-all hover:bg-[#383838] hover:border-white/20 text-left no-underline relative"
                         >
                           <span className="text-[13px] font-medium text-slate-200 line-clamp-2 group-hover/source:text-sky-300 transition-colors leading-snug">
                              {source.title}
