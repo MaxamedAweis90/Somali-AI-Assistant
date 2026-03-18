@@ -362,16 +362,16 @@ export function ChatShell({
             </div>
           </div>
 
-          <div className="pointer-events-auto flex items-center gap-2">
+          <div className="pointer-events-auto flex min-w-0 flex-nowrap items-center justify-end gap-2 overflow-hidden">
             {showWebStatus && (
-              <span className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1 shadow-sm backdrop-blur-md border", latestAssistantMessage?.grounded ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : "bg-sky-500/10 text-sky-300 border-sky-500/20")}>
+              <span className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 shadow-sm backdrop-blur-md border", latestAssistantMessage?.grounded ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : "bg-sky-500/10 text-sky-300 border-sky-500/20")}>
                 <Globe className="size-3.5" />
                 <span className="text-xs font-medium">{latestAssistantMessage?.grounded ? "Web verified" : "Web search active"}</span>
               </span>
             )}
             
             {templateLabel && templateDetails && (
-              <div ref={templatePopoverRef} className="relative">
+              <div ref={templatePopoverRef} className="relative hidden sm:block">
                 <button
                   type="button"
                   onClick={() => setIsTemplatePopoverOpen((current) => !current)}
