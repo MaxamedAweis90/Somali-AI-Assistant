@@ -127,6 +127,11 @@ export function ChatSidebar({
     ? conversations.find((conversation) => conversation.id === confirmDeleteId) ?? null
     : null;
 
+  const safeUserName = currentUserName?.trim() || "User";
+  const safeUserEmail = currentUserEmail?.trim() || "";
+  const safeUserAvatar = currentUserAvatar?.trim() || "";
+  const safeUsername = (currentUserName?.trim() || safeUserEmail.split("@")[0] || "user").toLowerCase().replace(/\s+/g, "");
+
   return (
     <aside
       className={cn(
@@ -231,15 +236,20 @@ export function ChatSidebar({
         )}
       </div>
 
-      {!isCollapsed && isAuthenticated && (
-        <div className="pb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
-          {isSearching ? "Searching results" : "Recent chats"}
-        </div>
-      )}
+      <div className="-mx-3 border-b border-white/10" />
 
-      <div className="chat-scrollbar-soft min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+      <div className="flex min-h-0 flex-1 flex-col pt-3">
         {!isCollapsed && isAuthenticated && (
-          <div className="space-y-1">
+          <div className="flex items-center justify-between gap-2 px-2 pb-2">
+            <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
+              {isSearching ? "Search results" : "Recent chats"}
+            </div>
+          </div>
+        )}
+
+        <div className="chat-scrollbar-soft min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-2 pr-1">
+          {!isCollapsed && isAuthenticated && (
+            <div className="space-y-1">
             {filteredConversations.map((conversation) => (
               <div
                 key={conversation.id}
@@ -251,10 +261,10 @@ export function ChatSidebar({
                 )}
               >
                 {activeConversationId === conversation.id && (
-                  <div className="pointer-events-none absolute inset-y-3 left-0 w-1 rounded-r-full bg-sky-300 shadow-[0_0_20px_rgba(125,211,252,0.9)]" />
+                  <div className="pointer-events-none absolute inset-y-2.5 left-0 w-1 rounded-r-full bg-sky-300 shadow-[0_0_20px_rgba(125,211,252,0.9)]" />
                 )}
-                <div className="px-3 py-2.5">
-                  <div className="flex items-start justify-between gap-2">
+                <div className="px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
                     {editingConversationId === conversation.id ? (
                       <div className="min-w-0 flex-1">
                         <input
@@ -290,7 +300,7 @@ export function ChatSidebar({
                       >
                         <p
                           className={cn(
-                            "truncate text-sm font-medium transition-colors",
+                            "truncate text-sm font-medium leading-5 transition-colors",
                             activeConversationId === conversation.id ? "text-white" : "text-slate-200 group-hover:text-white"
                           )}
                         >
@@ -374,30 +384,31 @@ export function ChatSidebar({
                 Wax natiijo ah lama helin.
               </div>
             )}
-          </div>
-        )}
-
-        {!isCollapsed && !isAuthenticated && (
-          <div className="rounded-[24px] border border-white/10 bg-white/4 p-4">
-            <p className="text-sm font-medium text-white">Guest mode</p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Waxaad isticmaali kartaa chat-ka adigoon galin, laakiin recent chats lama kaydinayo, mana heli kartid history.
-            </p>
-            <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-sm text-sky-100">
-              Fariimaha guest-ka kuu haray: {guestMessagesRemaining}
             </div>
-          </div>
-        )}
+          )}
+
+          {!isCollapsed && !isAuthenticated && (
+            <div className="rounded-[24px] border border-white/10 bg-white/4 p-4">
+              <p className="text-sm font-medium text-white">Guest mode</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Waxaad isticmaali kartaa chat-ka adigoon galin, laakiin recent chats lama kaydinayo, mana heli kartid history.
+              </p>
+              <div className="mt-4 rounded-2xl border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-sm text-sky-100">
+                Fariimaha guest-ka kuu haray: {guestMessagesRemaining}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="mt-2">
+      <div className="-mx-3 mt-3 border-t border-white/10 pt-3">
         {isAuthenticated ? (
           <UserProfile 
             user={{
-              name: currentUserName,
-              email: currentUserEmail,
-              avatar: currentUserAvatar,
-              username: currentUserName?.toLowerCase().replace(/\s+/g, '') // Fallback username generation
+              name: safeUserName,
+              email: safeUserEmail,
+              avatar: safeUserAvatar,
+              username: safeUsername,
             }}
             isCollapsed={isCollapsed}
             onLogout={onLogout}

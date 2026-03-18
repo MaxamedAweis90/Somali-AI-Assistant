@@ -7,7 +7,6 @@ import {
   LogOut,
   Mail,
   MessageSquare,
-  MoreHorizontal,
   Plus,
   PlusCircle,
   Settings,
@@ -128,7 +127,7 @@ export function UserProfile({
               )}
               
               {!isCollapsed && (
-                <MoreHorizontal className="ml-auto h-4 w-4 text-slate-500" />
+                <ChevronsUpDown className="ml-auto h-4 w-4 text-slate-500" />
               )}
             </div>
           </Button>
