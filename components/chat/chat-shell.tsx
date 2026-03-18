@@ -118,6 +118,7 @@ export function ChatShell({
   const modelPopoverRef = useRef<HTMLDivElement>(null);
   const [isTemplatePopoverOpen, setIsTemplatePopoverOpen] = useState(false);
   const [isModelPopoverOpen, setIsModelPopoverOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const isEmpty = messages.length === 0;
   const isSidebarCollapsed = useChatUIStore((state) => state.isSidebarCollapsed);
   const selectedModelId = useChatUIStore((state) => state.selectedModelId);
@@ -138,6 +139,43 @@ export function ChatShell({
   const templateDetails = latestAssistantMessage?.responseTemplate
     ? TEMPLATE_EXPLANATIONS[latestAssistantMessage.responseTemplate]
     : null;
+
+  const [enableLayoutTransitions, setEnableLayoutTransitions] = useState(false);
+
+  useEffect(() => {
+    if (useChatUIStore.persist.hasHydrated()) {
+      const id = requestAnimationFrame(() => setEnableLayoutTransitions(true));
+      return () => cancelAnimationFrame(id);
+    }
+
+    const unsubscribe = useChatUIStore.persist.onFinishHydration(() => {
+      const id = requestAnimationFrame(() => setEnableLayoutTransitions(true));
+      return () => cancelAnimationFrame(id);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileSidebarOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMobileSidebarOpen(false);
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMobileSidebarOpen]);
 
   useEffect(() => {
     const handlePointerDown = (event: PointerEvent) => {
@@ -181,11 +219,56 @@ export function ChatShell({
 
   return (
     <main
+      style={
+        {
+          "--sidebar-columns": `${isSidebarCollapsed ? 88 : 280}px 1fr`,
+        } as React.CSSProperties
+      }
       className={cn(
-        "grid h-screen grid-cols-1 overflow-hidden bg-transparent",
-        isSidebarCollapsed ? "md:grid-cols-[88px_1fr]" : "md:grid-cols-[280px_1fr]"
+        "grid h-[100dvh] grid-cols-1 overflow-hidden bg-transparent md:h-screen md:[grid-template-columns:var(--sidebar-columns)]",
+        enableLayoutTransitions && "md:transition-[grid-template-columns] md:duration-200 md:ease-out"
       )}
     >
+      {isMobileSidebarOpen && (
+        <div className="fixed inset-0 z-60 md:hidden">
+          <button
+            type="button"
+            aria-label="Close sidebar"
+            className="absolute inset-0 bg-slate-950/65 backdrop-blur-sm"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          />
+
+          <div className="absolute inset-y-0 left-0 w-[min(340px,86vw)]">
+            <ChatSidebar
+              conversations={conversations}
+              activeConversationId={activeConversationId}
+              onNewChat={() => {
+                setIsMobileSidebarOpen(false);
+                onNewChat();
+              }}
+              onSelectConversation={(id) => {
+                setIsMobileSidebarOpen(false);
+                onSelectConversation(id);
+              }}
+              onRenameConversation={onRenameConversation}
+              onDeleteConversation={onDeleteConversation}
+              isCollapsed={false}
+              onToggleCollapsed={() => setIsMobileSidebarOpen(false)}
+              isAuthenticated={isAuthenticated}
+              currentUserName={currentUserName}
+              currentUserEmail={currentUserEmail}
+              guestMessagesRemaining={guestMessagesRemaining}
+              onRequireAuth={() => {
+                setIsMobileSidebarOpen(false);
+                onRequireAuth();
+              }}
+              onUpdateProfile={onUpdateProfile}
+              onLogout={onLogout}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="hidden overflow-hidden md:block md:h-screen">
         <ChatSidebar
           conversations={conversations}
@@ -206,15 +289,15 @@ export function ChatShell({
         />
       </div>
 
-      <section className="relative min-h-0 min-w-0 overflow-hidden p-2.5 md:h-screen md:p-3">
+      <section className="relative min-h-0 min-w-0 overflow-hidden p-0 md:h-screen lg:p-3">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(125,211,252,0.12),transparent_24%),linear-gradient(180deg,rgba(5,10,24,0.18),rgba(2,6,23,0.02))]" />
 
-        <div className="relative z-10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[20px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,26,52,0.92),rgba(15,23,42,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-        <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between p-3 sm:px-6 md:py-4">
+        <div className="relative z-10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-none border-0 bg-[linear-gradient(180deg,rgba(15,26,52,0.92),rgba(15,23,42,0.96))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:rounded-[20px] lg:border lg:border-white/10">
+        <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:px-6 sm:pt-4 md:py-4">
           <div className="flex items-center gap-2 pointer-events-auto">
             <button
               type="button"
-              onClick={toggleSidebarCollapsed}
+              onClick={() => setIsMobileSidebarOpen(true)}
               className="inline-flex size-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800/50 transition md:hidden"
               aria-label="Open sidebar"
             >
@@ -323,21 +406,29 @@ export function ChatShell({
 
         <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {showEmptyState ? (
-            <div className="flex min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-4 sm:px-6 lg:px-8">
-              <ChatEmptyState
-                quickPrompts={quickPrompts}
-                onSelectPrompt={onInputChange}
-                composer={
-                  <MessageInput
-                    value={input}
-                    isTyping={isTyping}
-                    onChange={onInputChange}
-                    onSubmit={onSend}
-                    variant="centered"
-                  />
-                }
-              />
-            </div>
+            <>
+              <div className="flex min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-[calc(env(safe-area-inset-top)+3.75rem)] sm:px-6 sm:pb-6 sm:pt-6 lg:px-8">
+                <ChatEmptyState
+                  quickPrompts={quickPrompts}
+                  onSelectPrompt={onInputChange}
+                  composer={
+                    <div className="hidden md:block">
+                      <MessageInput
+                        value={input}
+                        isTyping={isTyping}
+                        onChange={onInputChange}
+                        onSubmit={onSend}
+                        variant="centered"
+                      />
+                    </div>
+                  }
+                />
+              </div>
+
+              <div className="md:hidden">
+                <MessageInput value={input} isTyping={isTyping} onChange={onInputChange} onSubmit={onSend} variant="docked" />
+              </div>
+            </>
           ) : (
             <>
               {isConversationPending ? (

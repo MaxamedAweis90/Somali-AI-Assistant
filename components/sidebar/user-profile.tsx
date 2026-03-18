@@ -132,64 +132,66 @@ export function UserProfile({
             </div>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent 
-          className="w-64 rounded-xl border-white/10 bg-[#0B1121] text-slate-200 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] backdrop-blur-xl" 
-          align="start" 
-          side="top" 
-          sideOffset={8}
-        >
-          <DropdownMenuLabel className="font-normal">
-            <div className="flex flex-col space-y-1">
-              <p className="text-sm font-medium leading-none text-white">{user.name}</p>
-              <p className="text-xs leading-none text-slate-400">{user.email}</p>
-            </div>
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator className="bg-white/10" />
-          <DropdownMenuGroup>
-             <DialogTrigger asChild>
+        <DropdownMenuPortal>
+          <DropdownMenuContent 
+            className="z-[120] w-64 rounded-xl border-white/10 bg-[#0B1121] text-slate-200 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] backdrop-blur-xl" 
+            align="start" 
+            side="top" 
+            sideOffset={8}
+          >
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none text-white">{user.name}</p>
+                <p className="text-xs leading-none text-slate-400">{user.email}</p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuGroup>
+              <DialogTrigger asChild>
+                <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+              </DialogTrigger>
               <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
-                <UserCircle className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+                <Sparkles className="mr-2 h-4 w-4 text-sky-400" />
+                <span>Upgrade Plan</span>
               </DropdownMenuItem>
-            </DialogTrigger>
-            <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
-              <Sparkles className="mr-2 h-4 w-4 text-sky-400" />
-              <span>Upgrade Plan</span>
+              <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="focus:bg-white/5 focus:text-white cursor-pointer">
+                <Sun className="mr-2 h-4 w-4" />
+                <span>Theme</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent className="border-white/10 bg-[#0B1121] text-slate-200 ml-2">
+                  <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
+                    <Sun className="mr-2 h-4 w-4" />
+                    <span>Light</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
+                    <Moon className="mr-2 h-4 w-4" />
+                    <span>Dark</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
+                    <Laptop className="mr-2 h-4 w-4" />
+                    <span>System</span>
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuItem onClick={onLogout} className="focus:bg-rose-500/10 focus:text-rose-400 cursor-pointer text-rose-400">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
             </DropdownMenuItem>
-            <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator className="bg-white/10" />
-           <DropdownMenuSub>
-            <DropdownMenuSubTrigger className="focus:bg-white/5 focus:text-white cursor-pointer">
-              <Sun className="mr-2 h-4 w-4" />
-              <span>Theme</span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuSubContent className="border-white/10 bg-[#0B1121] text-slate-200 ml-2">
-                <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
-                  <Sun className="mr-2 h-4 w-4" />
-                  <span>Light</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
-                  <Moon className="mr-2 h-4 w-4" />
-                  <span>Dark</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="focus:bg-white/5 focus:text-white cursor-pointer">
-                  <Laptop className="mr-2 h-4 w-4" />
-                  <span>System</span>
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuPortal>
-          </DropdownMenuSub>
-          <DropdownMenuSeparator className="bg-white/10" />
-          <DropdownMenuItem onClick={onLogout} className="focus:bg-rose-500/10 focus:text-rose-400 cursor-pointer text-rose-400">
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Log out</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
+          </DropdownMenuContent>
+        </DropdownMenuPortal>
       </DropdownMenu>
 
       <DialogContent className="sm:max-w-106.25 bg-[#0B1121] border-white/10 text-slate-200">

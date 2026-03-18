@@ -269,7 +269,9 @@ export function MessageInput({
 
       <div className={cn(
         "w-full transition-all flex justify-center", 
-        isExpanded ? "fixed inset-0 z-150 items-center p-4 sm:p-8 md:p-12 lg:p-20 pointer-events-none fade-in duration-300" : "pb-4",
+        isExpanded
+          ? "fixed inset-0 z-150 items-center p-4 sm:p-8 md:p-12 lg:p-20 pointer-events-none fade-in duration-300"
+          : "pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:pb-4",
         !isExpanded && (variant === "centered" ? "max-w-3xl mx-auto px-4" : "px-4 sm:px-6 lg:px-8")
       )}>
         <form onSubmit={handleSubmit} className={cn("w-full relative shadow-sm max-w-4xl pointer-events-auto", isExpanded && "h-[85vh] sm:h-[80vh] flex flex-col")}>

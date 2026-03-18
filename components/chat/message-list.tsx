@@ -167,16 +167,13 @@ export function MessageList({ activeConversationId, messages, streamingMessage, 
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-[linear-gradient(180deg,rgba(15,26,52,0.94),rgba(15,26,52,0.55),transparent)]" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-10 bg-[linear-gradient(0deg,rgba(15,23,42,0.96),rgba(15,23,42,0.62),transparent)]" />
-
       <section
         ref={scrollContainerRef}
-        className="chat-scrollbar min-h-0 h-full overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-6 pt-3 sm:px-6 sm:pt-4 lg:px-8"
+        className="chat-scrollbar min-h-0 h-full overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-6 pt-[calc(env(safe-area-inset-top)+5.25rem)] sm:px-6 sm:pt-24 lg:px-8"
       >
         <div ref={contentRef} className="mx-auto flex min-w-0 w-full max-w-160 flex-col gap-6">
           <div className="flex items-center gap-4 text-xs font-medium text-slate-400">
-            <span>Today</span>
+            <span>Maanta</span>
             <div className="h-px flex-1 bg-white/10" />
           </div>
 

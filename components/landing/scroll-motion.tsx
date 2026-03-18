@@ -45,6 +45,7 @@ function resolveAxis(direction: ScatterDirection, distance: number) {
 
 function useMotionProfile() {
   const [isMobile, setIsMobile] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 767px)");
@@ -56,12 +57,14 @@ function useMotionProfile() {
     updateProfile();
     mediaQuery.addEventListener("change", updateProfile);
 
+    setIsReady(true);
+
     return () => {
       mediaQuery.removeEventListener("change", updateProfile);
     };
   }, []);
 
-  return isMobile
+  const profile = isMobile
     ? {
         sectionTranslateScale: 0.4,
         sectionRotateRange: 0.85,
@@ -80,12 +83,26 @@ function useMotionProfile() {
         cardOpacityMin: 0.38,
         cardScaleMin: 0.96,
       };
+
+  return { profile, isReady };
+}
+
+function useMotionEnabled() {
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setHydrated(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  return hydrated;
 }
 
 export function MotionSection({ children, className, direction = "up", distance = 120, id }: MotionSectionProps) {
   const ref = useRef<HTMLElement | null>(null);
   const prefersReducedMotion = useReducedMotion();
-  const profile = useMotionProfile();
+  const motionEnabled = useMotionEnabled();
+  const { profile, isReady } = useMotionProfile();
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start 0.92", "end 0.08"],
@@ -134,7 +151,7 @@ export function MotionSection({ children, className, direction = "up", distance 
       ref={ref}
       className={className}
       style={
-        prefersReducedMotion
+        prefersReducedMotion || !motionEnabled || !isReady
           ? undefined
           : {
               opacity,
@@ -154,7 +171,8 @@ export function MotionSection({ children, className, direction = "up", distance 
 export function MotionCard({ children, className, direction = "up", distance = 72 }: MotionCardProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const prefersReducedMotion = useReducedMotion();
-  const profile = useMotionProfile();
+  const motionEnabled = useMotionEnabled();
+  const { profile, isReady } = useMotionProfile();
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start 0.96", "end 0.08"],
@@ -190,7 +208,11 @@ export function MotionCard({ children, className, direction = "up", distance = 7
     <motion.div
       ref={ref}
       className={className}
-      style={prefersReducedMotion ? undefined : { opacity, scale, x, y, willChange: "transform, opacity" }}
+      style={
+        prefersReducedMotion || !motionEnabled || !isReady
+          ? undefined
+          : { opacity, scale, x, y, willChange: "transform, opacity" }
+      }
     >
       {children}
     </motion.div>
