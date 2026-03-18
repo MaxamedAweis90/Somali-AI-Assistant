@@ -48,6 +48,13 @@ export function proxy(request: NextRequest) {
       target.search = request.nextUrl.search;
       return NextResponse.redirect(target);
     }
+
+    if (pathname === "/login" || pathname === "/register") {
+      const target = new URL(chatBaseUrl);
+      target.pathname = pathname;
+      target.search = request.nextUrl.search;
+      return NextResponse.redirect(target);
+    }
   }
 
   if (variant === "chat" && landingBaseUrl) {
