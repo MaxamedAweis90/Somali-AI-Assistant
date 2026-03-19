@@ -14,9 +14,10 @@ interface MessageListProps {
   streamingMessage: ChatMessage | null;
   isTyping: boolean;
   onEditSubmit?: (messageId: string, text: string) => void;
+  onAtTopChange?: (isAtTop: boolean) => void;
 }
 
-export function MessageList({ activeConversationId, messages, streamingMessage, isTyping, onEditSubmit }: MessageListProps) {
+export function MessageList({ activeConversationId, messages, streamingMessage, isTyping, onEditSubmit, onAtTopChange }: MessageListProps) {
   const scrollContainerRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -27,6 +28,7 @@ export function MessageList({ activeConversationId, messages, streamingMessage, 
   const previousConversationIdRef = useRef<string | null>(null);
   const pendingConversationScrollRef = useRef(false);
   const [tailSpacerHeight, setTailSpacerHeight] = useState(0);
+  const lastAtTopRef = useRef<boolean | null>(null);
 
   const scrollToPinnedMessage = (messageId: string, behavior: ScrollBehavior) => {
     const container = scrollContainerRef.current;
@@ -49,6 +51,20 @@ export function MessageList({ activeConversationId, messages, streamingMessage, 
 
     container.scrollTo({ top: container.scrollHeight, behavior });
   };
+
+  const syncAtTop = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const isAtTop = container.scrollTop <= 1;
+    if (lastAtTopRef.current === isAtTop) return;
+    lastAtTopRef.current = isAtTop;
+    onAtTopChange?.(isAtTop);
+  };
+
+  useLayoutEffect(() => {
+    syncAtTop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversationId]);
 
   useLayoutEffect(() => {
     if (previousConversationIdRef.current === activeConversationId) {
@@ -169,6 +185,7 @@ export function MessageList({ activeConversationId, messages, streamingMessage, 
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <section
         ref={scrollContainerRef}
+        onScroll={syncAtTop}
         className="chat-scrollbar min-h-0 h-full overflow-x-hidden overflow-y-auto overscroll-contain px-4 pb-6 pt-[calc(env(safe-area-inset-top)+5.25rem)] sm:px-6 sm:pt-24 lg:px-8"
       >
         <div ref={contentRef} className="mx-auto flex min-w-0 w-full max-w-160 flex-col gap-6">

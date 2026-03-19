@@ -134,7 +134,7 @@ export function UserProfile({
         </DropdownMenuTrigger>
         <DropdownMenuPortal>
           <DropdownMenuContent 
-            className="z-[120] w-64 rounded-xl border-white/10 bg-[#0B1121] text-slate-200 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] backdrop-blur-xl" 
+            className="w-64 rounded-xl border-white/10 bg-[#0B1121] text-slate-200 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] backdrop-blur-xl" 
             align="start" 
             side="top" 
             sideOffset={8}

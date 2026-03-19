@@ -119,6 +119,7 @@ export function ChatShell({
   const [isTemplatePopoverOpen, setIsTemplatePopoverOpen] = useState(false);
   const [isModelPopoverOpen, setIsModelPopoverOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isContentAtTop, setIsContentAtTop] = useState(true);
   const isEmpty = messages.length === 0;
   const isSidebarCollapsed = useChatUIStore((state) => state.isSidebarCollapsed);
   const selectedModelId = useChatUIStore((state) => state.selectedModelId);
@@ -319,7 +320,12 @@ export function ChatShell({
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(true)}
-              className="inline-flex size-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800/50 transition md:hidden"
+              className={cn(
+                "inline-flex size-10 items-center justify-center text-slate-200 transition md:hidden",
+                isContentAtTop
+                  ? "rounded-lg bg-transparent hover:bg-slate-800/50"
+                  : "rounded-full border border-white/10 bg-slate-900/60 backdrop-blur-md hover:bg-slate-800/60"
+              )}
               aria-label="Open sidebar"
             >
               <Menu className="size-5" />
@@ -329,7 +335,12 @@ export function ChatShell({
               <button
                 type="button"
                 onClick={() => setIsModelPopoverOpen((current) => !current)}
-                className="group flex items-center gap-2 rounded-xl border border-transparent px-3 py-2 transition-colors hover:bg-slate-800/50"
+                className={cn(
+                  "group flex items-center gap-2 border px-3 py-2 transition-colors",
+                  isContentAtTop
+                    ? "rounded-xl border-transparent bg-transparent hover:bg-slate-800/50"
+                    : "rounded-full border-white/10 bg-slate-900/60 backdrop-blur-md hover:bg-slate-800/60"
+                )}
                 aria-label="Switch model"
                 aria-expanded={isModelPopoverOpen}
               >
@@ -430,7 +441,13 @@ export function ChatShell({
         <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {showEmptyState ? (
             <>
-              <div className="flex min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-[calc(env(safe-area-inset-top)+3.75rem)] sm:px-6 sm:pb-6 sm:pt-6 lg:px-8">
+              <div
+                className="flex min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+7rem)] pt-[calc(env(safe-area-inset-top)+3.75rem)] sm:px-6 sm:pb-6 sm:pt-6 lg:px-8"
+                onScroll={(event) => {
+                  const el = event.currentTarget;
+                  setIsContentAtTop(el.scrollTop <= 1);
+                }}
+              >
                 <ChatEmptyState
                   quickPrompts={quickPrompts}
                   onSelectPrompt={onInputChange}
@@ -462,7 +479,13 @@ export function ChatShell({
                       <div className="h-px flex-1 bg-white/10" />
                     </div>
 
-                    <div className="chat-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
+                    <div
+                      className="chat-scrollbar min-h-0 flex-1 overflow-y-auto pr-1"
+                      onScroll={(event) => {
+                        const el = event.currentTarget;
+                        setIsContentAtTop(el.scrollTop <= 1);
+                      }}
+                    >
                       <div className="flex flex-col gap-6 pb-12">
                         <div className="ml-auto w-full max-w-90 rounded-[20px] bg-white/8 px-4 py-3">
                           <div className="space-y-2 animate-pulse">
@@ -492,6 +515,7 @@ export function ChatShell({
                   streamingMessage={streamingMessage}
                   isTyping={isTyping}
                   onEditSubmit={onEditSubmit}
+                  onAtTopChange={setIsContentAtTop}
                 />
               )}
               <MessageInput value={input} isTyping={isTyping} onChange={onInputChange} onSubmit={onSend} />

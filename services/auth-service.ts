@@ -1,4 +1,4 @@
-import { AppwriteException, Models } from "appwrite";
+import { AppwriteException, Models, OAuthProvider } from "appwrite";
 import { getAccount, getAppwriteConfigError, ID, isAppwriteConfigured } from "@/lib/appwrite/client";
 
 export interface RegisterInput {
@@ -33,6 +33,24 @@ export async function loginWithEmail({ email, password }: LoginInput) {
   const account = getAccount();
   await account.createEmailPasswordSession(email, password);
   return account.get();
+}
+
+export async function loginWithGoogle(nextPath = "/chat") {
+  if (!isAppwriteConfigured()) {
+    throw new Error(getAppwriteConfigError());
+  }
+
+  if (typeof window === "undefined") {
+    throw new Error("OAuth login waa in uu ka dhacaa browser-ka.");
+  }
+
+  const origin = window.location.origin;
+  const safeNext = nextPath.startsWith("/") ? nextPath : "/chat";
+  const successUrl = `${origin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
+  const failureUrl = `${origin}/login?oauth=google_failed`;
+
+  const account = getAccount();
+  account.createOAuth2Session(OAuthProvider.Google, successUrl, failureUrl);
 }
 
 export async function getCurrentUser() {
